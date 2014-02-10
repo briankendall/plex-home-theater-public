@@ -96,6 +96,8 @@
 using namespace PLAYLIST;
 /* END PLEX */
 
+#include "guilib/GUIControlFactory.h"
+
 #define SYSHEATUPDATEINTERVAL 60000
 
 using namespace std;
@@ -294,6 +296,10 @@ const infomap system_labels[] =  {{ "hasnetwork",       SYSTEM_ETHERNET_LINK_ACT
                                   { "screenheight",     SYSTEM_SCREEN_HEIGHT },
                                   { "currentwindow",    SYSTEM_CURRENT_WINDOW },
                                   { "currentcontrol",   SYSTEM_CURRENT_CONTROL },
+                                  { "currentcontroltype", SYSTEM_CURRENT_CONTROL_TYPE },
+                                  { "currentcontrolparentlabel", SYSTEM_CURRENT_CONTROL_PARENT_LABEL },
+                                  { "currentcontrolparenttype", SYSTEM_CURRENT_CONTROL_PARENT_TYPE },
+                                  { "currentcontrolorientation", SYSTEM_CURRENT_CONTROL_ORIENTATION },
                                   { "dvdlabel",         SYSTEM_DVD_LABEL },
                                   { "internetstate",    SYSTEM_INTERNET_STATE },
                                   { "kernelversion",    SYSTEM_KERNEL_VERSION },
@@ -1759,6 +1765,71 @@ CStdString CGUIInfoManager::GetLabel(int info, int contextWindow, CStdString *fa
         CGUIControl *control = window->GetFocusedControl();
         if (control)
           strLabel = control->GetDescription();
+      }
+    }
+    break;
+  case SYSTEM_CURRENT_CONTROL_TYPE:
+    {
+      CGUIWindow *window = g_windowManager.GetWindow(g_windowManager.GetFocusedWindow());
+      if (window)
+      {
+        CGUIControl *control = window->GetFocusedControl();
+        if (control) {
+          strLabel = CGUIControlFactory::TranslateControlType(control->GetControlType());
+        }
+      }
+    }
+    break;
+  case SYSTEM_CURRENT_CONTROL_PARENT_LABEL:
+    {
+      CGUIWindow *window = g_windowManager.GetWindow(g_windowManager.GetFocusedWindow());
+      if (window)
+      {
+        CGUIControl *control = window->GetFocusedControl();
+        if (control) {
+          CGUIControl *parent = control->GetParentControl();
+          if (parent) {
+            strLabel = parent->GetDescription();
+          }
+        }
+      }
+    }
+    break;
+  case SYSTEM_CURRENT_CONTROL_PARENT_TYPE:
+    {
+      CGUIWindow *window = g_windowManager.GetWindow(g_windowManager.GetFocusedWindow());
+      if (window)
+      {
+        CGUIControl *control = window->GetFocusedControl();
+        if (control) {
+          CGUIControl *parent = control->GetParentControl();
+          if (parent) {
+            strLabel = CGUIControlFactory::TranslateControlType(parent->GetControlType());
+          }
+        }
+      }
+    }
+    break;
+  case SYSTEM_CURRENT_CONTROL_ORIENTATION:
+    {
+      strLabel = "";
+      CGUIWindow *window = g_windowManager.GetWindow(g_windowManager.GetFocusedWindow());
+      if (window)
+      {
+        CGUIControl *control = window->GetFocusedControl();
+        if (control) {
+          CGUIControl::GUICONTROLTYPES type = control->GetControlType();
+          if (type == CGUIControl::GUICONTAINER_LIST || type == CGUIControl::GUICONTAINER_WRAPLIST || type == CGUIControl::GUICONTAINER_FIXEDLIST || type == CGUIControl::GUICONTAINER_PANEL) {
+            CGUIBaseContainer *container = dynamic_cast<CGUIBaseContainer *>(control);
+            if (container) {
+              if (container->GetOrientation() == HORIZONTAL) {
+                strLabel = "horizontal";
+              } else {
+                strLabel = "vertical";
+              }
+            }
+          }
+        }
       }
     }
     break;

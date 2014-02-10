@@ -644,6 +644,13 @@ namespace INFO
 #define MULTI_INFO_END                99999
 #define COMBINED_VALUES_START        100000
 
+// Added by Brian for getting info for the current control
+
+#define SYSTEM_CURRENT_CONTROL_TYPE            4200
+#define SYSTEM_CURRENT_CONTROL_PARENT_LABEL    4201
+#define SYSTEM_CURRENT_CONTROL_PARENT_TYPE     4202
+#define SYSTEM_CURRENT_CONTROL_ORIENTATION     4203
+
 // forward
 class CInfoLabel;
 class CGUIWindow;

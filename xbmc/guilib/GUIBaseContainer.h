@@ -111,6 +111,8 @@ public:
   std::vector<CGUIListItemPtr>& GetItems() { return m_items; }
   /* END PLEX */
 
+  ORIENTATION GetOrientation() { return m_orientation; }
+    
 #ifdef _DEBUG
   virtual void DumpTextureUse();
 #endif

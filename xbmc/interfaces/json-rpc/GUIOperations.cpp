@@ -108,7 +108,16 @@ JSONRPC_STATUS CGUIOperations::GetPropertyValue(const CStdString &property, CVar
   }
   else if (property.Equals("currentcontrol"))
     result["label"] = g_infoManager.GetLabel(g_infoManager.TranslateString("System.CurrentControl"));
-  else if (property.Equals("skin"))
+    
+  else if (property.Equals("currentcontrolinfo")) {
+    result["label"] = g_infoManager.GetLabel(g_infoManager.TranslateString("System.CurrentControl"));
+    result["type"] = g_infoManager.GetLabel(g_infoManager.TranslateString("System.CurrentControlType"));
+    result["parentlabel"] = g_infoManager.GetLabel(g_infoManager.TranslateString("System.CurrentControlParentLabel"));
+    result["parenttype"] = g_infoManager.GetLabel(g_infoManager.TranslateString("System.CurrentControlParentType"));
+    result["windowlabel"] = g_infoManager.GetLabel(g_infoManager.TranslateString("System.CurrentWindow"));
+    result["orientation"] = g_infoManager.GetLabel(g_infoManager.TranslateString("System.CurrentControlOrientation"));
+    
+  } else if (property.Equals("skin"))
   {
     CStdString skinId = g_guiSettings.GetString("lookandfeel.skin");
     AddonPtr addon;
