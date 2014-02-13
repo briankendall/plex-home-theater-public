@@ -858,6 +858,25 @@ public:
   void SetSlideshowShowDescription(bool show);
   /* END PLEX */
 
+  /* Bri Bri */
+  class CurrentControlInfo {
+  public:
+    CStdString control;
+    CStdString parent;
+    CStdString type;
+    CStdString parentType;
+    CStdString window;
+    CStdString orientation;
+    bool isList;
+    int row;
+    int column;
+    int rowCount;
+    int columnCount;
+    int itemCount;
+  };
+  void GetCurrentControlInfo(CurrentControlInfo &info);
+  /* END Bri Bri */
+
 protected:
   friend class INFO::InfoSingle;
   bool GetBool(int condition, int contextWindow = 0, const CGUIListItem *item=NULL);

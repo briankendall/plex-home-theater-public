@@ -97,6 +97,7 @@ using namespace PLAYLIST;
 /* END PLEX */
 
 #include "guilib/GUIControlFactory.h"
+#include "guilib/GUIPanelContainer.h"
 
 #define SYSHEATUPDATEINTERVAL 60000
 
@@ -5890,3 +5891,86 @@ bool CGUIInfoManager::GetEpgInfoTag(CEpgInfoTag& tag) const
   }
   return false;
 }
+
+/* Bri Bri */
+void CGUIInfoManager::GetCurrentControlInfo(CurrentControlInfo &info)
+{
+    info.control = "";
+    info.parent = "";
+    info.type = "";
+    info.parentType = "";
+    info.window = "";
+    info.orientation = "";
+    info.row = -1;
+    info.column = -1;
+    info.rowCount = -1;
+    info.columnCount = -1;
+    info.itemCount = -1;
+    info.isList = false;
+    
+    CGUIWindow *window = g_windowManager.GetWindow(g_windowManager.GetFocusedWindow());
+    if (window) {
+        info.window = g_localizeStrings.Get(g_windowManager.GetFocusedWindow());
+        CGUIControl *control = window->GetFocusedControl();
+        
+        if (control) {
+            CGUIControl::GUICONTROLTYPES type = control->GetControlType();
+            info.control = control->GetDescription();
+            info.type = CGUIControlFactory::TranslateControlType(type);
+            
+            CGUIControl *parent = control->GetParentControl();
+            if (parent) {
+                info.parent = parent->GetDescription();
+                info.parentType = CGUIControlFactory::TranslateControlType(parent->GetControlType());
+            }
+            
+            if (type == CGUIControl::GUICONTAINER_LIST || type == CGUIControl::GUICONTAINER_WRAPLIST || type == CGUIControl::GUICONTAINER_FIXEDLIST || type == CGUIControl::GUICONTAINER_PANEL) {
+                info.isList = true;
+                CGUIBaseContainer *container = dynamic_cast<CGUIBaseContainer *>(control);
+                
+                if (container) {
+                    ORIENTATION orientation = container->GetOrientation();
+                    if (orientation == HORIZONTAL) {
+                        info.orientation = "horizontal";
+                        
+                    } else {
+                        info.orientation = "vertical";
+                    }
+                    
+                    if (type == CGUIControl::GUICONTAINER_PANEL) {
+                        CGUIPanelContainer *panel = dynamic_cast<CGUIPanelContainer *>(control);
+                        
+                        if (panel) {
+                            info.itemCount = panel->GetNumItems();
+                            info.rowCount = panel->GetRows() / panel->GetItemsPerRow();
+                            info.columnCount = panel->GetItemsPerRow();
+                            info.row = panel->GetSelectedItem() / panel->GetItemsPerRow();
+                            info.column = panel->GetSelectedItem() % panel->GetItemsPerRow();
+                        }
+                    } else {
+                        if (orientation == HORIZONTAL) {
+                    
+                            info.columnCount = container->GetNumItems();
+                            info.rowCount = 1;
+                            info.row = 0;
+                            info.column = container->GetSelectedItem();
+                            info.itemCount = info.columnCount;
+                        
+                        } else {
+                            info.rowCount = container->GetNumItems();
+                            info.columnCount = 1;
+                            info.column = 0;
+                            info.row = container->GetSelectedItem();
+                            info.itemCount = info.rowCount;
+                        }
+                    }
+                    
+                }
+            }
+        }
+    }
+}
+/* END Bri Bri */
+
+
+

@@ -110,12 +110,21 @@ JSONRPC_STATUS CGUIOperations::GetPropertyValue(const CStdString &property, CVar
     result["label"] = g_infoManager.GetLabel(g_infoManager.TranslateString("System.CurrentControl"));
     
   else if (property.Equals("currentcontrolinfo")) {
-    result["label"] = g_infoManager.GetLabel(g_infoManager.TranslateString("System.CurrentControl"));
-    result["type"] = g_infoManager.GetLabel(g_infoManager.TranslateString("System.CurrentControlType"));
-    result["parentlabel"] = g_infoManager.GetLabel(g_infoManager.TranslateString("System.CurrentControlParentLabel"));
-    result["parenttype"] = g_infoManager.GetLabel(g_infoManager.TranslateString("System.CurrentControlParentType"));
-    result["windowlabel"] = g_infoManager.GetLabel(g_infoManager.TranslateString("System.CurrentWindow"));
-    result["orientation"] = g_infoManager.GetLabel(g_infoManager.TranslateString("System.CurrentControlOrientation"));
+    CGUIInfoManager::CurrentControlInfo info;
+    g_infoManager.GetCurrentControlInfo(info);
+    result["control"] = info.control;
+    result["type"] = info.type;
+    result["parent"] = info.parent;
+    result["parenttype"] = info.parentType;
+    result["window"] = info.window;
+    if (info.isList) {
+      result["orientation"] = info.orientation;
+      result["row"] = info.row;
+      result["column"] = info.column;
+      result["rowCount"] = info.rowCount;
+      result["columnCount"] = info.columnCount;
+      result["itemCount"] = info.itemCount;
+    }
     
   } else if (property.Equals("skin"))
   {

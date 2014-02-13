@@ -112,6 +112,7 @@ public:
   /* END PLEX */
 
   ORIENTATION GetOrientation() { return m_orientation; }
+  virtual unsigned int GetNumItems() const { return m_items.size(); };
     
 #ifdef _DEBUG
   virtual void DumpTextureUse();
@@ -139,7 +140,6 @@ protected:
   virtual bool SelectItemFromPoint(const CPoint &point) { return false; };
   virtual int GetCursorFromPoint(const CPoint &point, CPoint *itemPoint = NULL) const { return -1; };
   virtual void Reset();
-  virtual unsigned int GetNumItems() const { return m_items.size(); };
   virtual int GetCurrentPage() const;
   bool InsideLayout(const CGUIListItemLayout *layout, const CPoint &point) const;
   virtual void OnFocus();

@@ -47,6 +47,12 @@ public:
   virtual void OnUp();
   virtual void OnDown();
   virtual bool GetCondition(int condition, int data) const;
+  
+  int GetItemsPerRow() {return m_itemsPerRow;}
+  virtual int GetSelectedItem() { return GetOffset()*m_itemsPerRow + GetCursor(); }
+  unsigned int GetRows() const;
+  virtual unsigned int GetNumItems() const { return m_items.size(); };
+  
 protected:
   virtual bool MoveUp(bool wrapAround);
   virtual bool MoveDown(bool wrapAround);
@@ -56,7 +62,6 @@ protected:
   float AnalogScrollSpeed() const;
   virtual void ValidateOffset();
   virtual void CalculateLayout();
-  unsigned int GetRows() const;
   virtual int  CorrectOffset(int offset, int cursor) const;
   virtual bool SelectItemFromPoint(const CPoint &point);
   virtual int GetCursorFromPoint(const CPoint &point, CPoint *itemPoint = NULL) const;
