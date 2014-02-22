@@ -20,6 +20,7 @@
 
 #include "GUIWindowManager.h"
 #include "GUIAudioManager.h"
+#include "GUIBaseContainer.h"
 #include "GUIDialog.h"
 #include "Application.h"
 #include "ApplicationMessenger.h"
@@ -34,6 +35,7 @@
 #include "GUITexture.h"
 #include "windowing/WindowingFactory.h"
 #include "utils/Variant.h"
+#include "interfaces/AnnouncementManager.h"
 
 using namespace std;
 
@@ -211,6 +213,7 @@ void CGUIWindowManager::AddModeless(CGUIWindow* dialog)
   for (iDialog it = m_activeDialogs.begin(); it != m_activeDialogs.end(); ++it)
     if (*it == dialog) return;
   m_activeDialogs.push_back(dialog);
+  MaybeAnnounceNewFocus();
 }
 
 void CGUIWindowManager::Remove(int id)
@@ -221,13 +224,15 @@ void CGUIWindowManager::Remove(int id)
   {
     for(vector<CGUIWindow*>::iterator it2 = m_activeDialogs.begin(); it2 != m_activeDialogs.end();)
     {
-      if(*it2 == it->second)
-        it2 = m_activeDialogs.erase(it2);
-      else
+        if(*it2 == it->second) {
+            it2 = m_activeDialogs.erase(it2);
+            
+        } else
         it2++;
     }
 
-    m_mapWindows.erase(it);
+      m_mapWindows.erase(it);
+      MaybeAnnounceNewFocus();
   }
   else
   {
@@ -267,8 +272,10 @@ void CGUIWindowManager::PreviousWindow()
     //       whether our history should be changed
 
     // don't reactivate the previouswindow if it is ourselves.
-    if (currentWindow != pCurrentWindow->GetPreviousWindow())
-      ActivateWindow(pCurrentWindow->GetPreviousWindow());
+      if (currentWindow != pCurrentWindow->GetPreviousWindow()) {
+          ActivateWindow(pCurrentWindow->GetPreviousWindow());
+          MaybeAnnounceNewFocus();
+      }
     return;
   }
   // get the previous window in our stack
@@ -277,7 +284,8 @@ void CGUIWindowManager::PreviousWindow()
     if (GetActiveWindow() != WINDOW_INVALID && GetActiveWindow() != WINDOW_HOME)
     {
       ClearWindowHistory();
-      ActivateWindow(WINDOW_HOME);
+        ActivateWindow(WINDOW_HOME);
+        MaybeAnnounceNewFocus();
     }
     return;
   }
@@ -290,7 +298,8 @@ void CGUIWindowManager::PreviousWindow()
   {
     CLog::Log(LOGERROR, "Unable to activate the previous window");
     ClearWindowHistory();
-    ActivateWindow(WINDOW_HOME);
+      ActivateWindow(WINDOW_HOME);
+      MaybeAnnounceNewFocus();
     return;
   }
 
@@ -317,6 +326,9 @@ void CGUIWindowManager::PreviousWindow()
   pNewWindow->OnMessage(msg2);
 
   g_infoManager.SetPreviousWindow(WINDOW_INVALID);
+    
+  MaybeAnnounceNewFocus();
+    
   return;
 }
 
@@ -722,7 +734,8 @@ void CGUIWindowManager::RouteToWindow(CGUIWindow* dialog)
   // #we may have routed to it before
   RemoveDialog(dialog->GetID());
 
-  m_activeDialogs.push_back(dialog);
+    m_activeDialogs.push_back(dialog);
+    MaybeAnnounceNewFocus();
 }
 
 /// \brief Unroute window
@@ -734,7 +747,8 @@ void CGUIWindowManager::RemoveDialog(int id)
   {
     if ((*it)->GetID() == id)
     {
-      m_activeDialogs.erase(it);
+        m_activeDialogs.erase(it);
+        MaybeAnnounceNewFocus();
       return;
     }
   }
@@ -834,7 +848,7 @@ int CGUIWindowManager::GetFocusedWindow() const
   int dialog = GetTopMostModalDialogID(true);
   if (dialog != WINDOW_INVALID)
     return dialog;
-
+    
   return GetActiveWindow();
 }
 
@@ -947,6 +961,7 @@ void CGUIWindowManager::AddToWindowHistory(int newWindowID)
   { // didn't find window in history - add it to the stack
     m_windowHistory.push(newWindowID);
   }
+    MaybeAnnounceNewFocus();
 }
 
 void CGUIWindowManager::GetActiveModelessWindows(vector<int> &ids)
@@ -1019,3 +1034,65 @@ void CGUIWindowManager::DumpTextureUse()
   }
 }
 #endif
+
+void CGUIWindowManager::MaybeAnnounceNewFocus()
+{
+    static bool firstAnnouncement = true;
+    static int lastWindowId = 0, lastControlId = 0, lastItem = 0;
+    static bool lastIsGroup;
+    static int blah = 0;
+    
+    int newWindowId = lastWindowId;
+    int newControlId = lastControlId;
+    bool newIsGroup = lastIsGroup;
+    int newItem = lastItem;
+    
+    CGUIWindow *window = g_windowManager.GetWindow(g_windowManager.GetFocusedWindow());
+    if (window) {
+        newWindowId = window->GetID();
+        CGUIControl *control = window->GetFocusedControl();
+        if (control) {
+            newControlId = control->GetID();
+            
+            CGUIControl::GUICONTROLTYPES type = control->GetControlType();
+            if (type == CGUIControl::GUICONTAINER_LIST || type == CGUIControl::GUICONTAINER_WRAPLIST || type == CGUIControl::GUICONTAINER_FIXEDLIST || type == CGUIControl::GUICONTAINER_PANEL) {
+                CGUIBaseContainer *container = dynamic_cast<CGUIBaseContainer *>(control);
+                
+                if (container) {
+                    newIsGroup = true;
+                    newItem = container->GetSelectedItem();
+                }
+            }
+        }
+    }
+    
+    if (firstAnnouncement || newWindowId != lastWindowId || newControlId != lastControlId || newIsGroup != lastIsGroup || (newIsGroup && newItem != lastItem)) {
+        CGUIInfoManager::CurrentControlInfo info;
+        g_infoManager.GetCurrentControlInfo(info);
+        
+        CVariant param;
+        
+        param["control"] = info.control;
+        param["type"] = info.type;
+        param["parent"] = info.parent;
+        param["parenttype"] = info.parentType;
+        param["window"] = info.window;
+        param["id"] = info.controlId;
+        if (info.isList) {
+            param["orientation"] = info.orientation;
+            param["row"] = info.row;
+            param["column"] = info.column;
+            param["rowCount"] = info.rowCount;
+            param["columnCount"] = info.columnCount;
+            param["itemCount"] = info.itemCount;
+        }
+        
+        ANNOUNCEMENT::CAnnouncementManager::Announce(ANNOUNCEMENT::GUI, "xbmc", "OnFocusChanged", param);
+    }
+    
+    firstAnnouncement = false;
+    lastWindowId = newWindowId;
+    lastControlId = newControlId;
+    lastItem = newItem;
+    lastIsGroup = newIsGroup;
+}

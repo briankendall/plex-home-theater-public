@@ -23,6 +23,7 @@
 #include "GUIInfoManager.h"
 #include "GUIControlProfiler.h"
 #include "GUIFont.h" // for XBFONT_* definitions
+#include "guilib/GUIWindowManager.h"
 
 CGUIControlGroupList::CGUIControlGroupList(int parentID, int controlID, float posX, float posY, float width, float height, float itemGap, int pageControl, ORIENTATION orientation, bool useControlPositions, uint32_t alignment, const CScroller& scroller)
 : CGUIControlGroup(parentID, controlID, posX, posY, width, height)
@@ -186,7 +187,8 @@ bool CGUIControlGroupList::OnMessage(CGUIMessage& message)
           continue;
         if (control->CanFocus() && offset >= m_scroller.GetValue() && offset + Size(control) <= m_scroller.GetValue() + Size())
         {
-          m_focusedControl = control->GetID();
+            m_focusedControl = control->GetID();
+            g_windowManager.MaybeAnnounceNewFocus();
           break;
         }
         offset += Size(control) + m_itemGap;

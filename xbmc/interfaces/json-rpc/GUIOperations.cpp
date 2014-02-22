@@ -117,6 +117,7 @@ JSONRPC_STATUS CGUIOperations::GetPropertyValue(const CStdString &property, CVar
     result["parent"] = info.parent;
     result["parenttype"] = info.parentType;
     result["window"] = info.window;
+    result["id"] = info.controlId;
     if (info.isList) {
       result["orientation"] = info.orientation;
       result["row"] = info.row;

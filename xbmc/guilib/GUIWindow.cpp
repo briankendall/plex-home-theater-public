@@ -46,6 +46,7 @@
 #ifdef HAS_PERFORMANCE_SAMPLE
 #include "utils/PerformanceSample.h"
 #endif
+#include "guilib/GUIWindowManager.h"
 
 using namespace std;
 
@@ -607,7 +608,8 @@ bool CGUIWindow::OnMessage(CGUIMessage& message)
     { // a control has been focused
       if (HasID(message.GetSenderId()))
       {
-        m_focusedControl = message.GetControlId();
+          m_focusedControl = message.GetControlId();
+          g_windowManager.MaybeAnnounceNewFocus();
         return true;
       }
       break;

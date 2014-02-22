@@ -20,6 +20,7 @@
 
 #include "GUIControlGroup.h"
 #include "GUIControlProfiler.h"
+#include "guilib/GUIWindowManager.h"
 
 using namespace std;
 
@@ -159,6 +160,7 @@ bool CGUIControlGroup::OnMessage(CGUIMessage& message)
       if (message.GetControlId() == GetID())
       {
         m_focusedControl = message.GetParam1();
+        g_windowManager.MaybeAnnounceNewFocus();
         return true;
       }
       break;
@@ -174,11 +176,12 @@ bool CGUIControlGroup::OnMessage(CGUIMessage& message)
     }
   case GUI_MSG_FOCUSED:
     { // a control has been focused
-      m_focusedControl = message.GetControlId();
+        m_focusedControl = message.GetControlId();
       SetFocus(true);
       // tell our parent thatwe have focus
       if (m_parentControl)
-        m_parentControl->OnMessage(message);
+          m_parentControl->OnMessage(message);
+        g_windowManager.MaybeAnnounceNewFocus();
       return true;
     }
   case GUI_MSG_SETFOCUS:

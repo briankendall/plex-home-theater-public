@@ -1289,6 +1289,8 @@ void CGUIBaseContainer::GetCacheOffsets(int &cacheBefore, int &cacheAfter)
 void CGUIBaseContainer::SetCursor(int cursor)
 {
   m_cursor = cursor;
+    
+  g_windowManager.MaybeAnnounceNewFocus();
 }
 
 void CGUIBaseContainer::SetOffset(int offset)
@@ -1296,6 +1298,8 @@ void CGUIBaseContainer::SetOffset(int offset)
   if (m_offset != offset)
     MarkDirtyRegion();
   m_offset = offset;
+    
+  g_windowManager.MaybeAnnounceNewFocus();
 }
 
 bool CGUIBaseContainer::CanFocus() const

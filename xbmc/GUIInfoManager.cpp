@@ -5917,6 +5917,7 @@ void CGUIInfoManager::GetCurrentControlInfo(CurrentControlInfo &info)
             CGUIControl::GUICONTROLTYPES type = control->GetControlType();
             info.control = control->GetDescription();
             info.type = CGUIControlFactory::TranslateControlType(type);
+            info.controlId = control->GetID();
             
             CGUIControl *parent = control->GetParentControl();
             if (parent) {

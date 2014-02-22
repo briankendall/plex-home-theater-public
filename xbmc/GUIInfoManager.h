@@ -873,6 +873,7 @@ public:
     int rowCount;
     int columnCount;
     int itemCount;
+    int controlId;
   };
   void GetCurrentControlInfo(CurrentControlInfo &info);
   /* END Bri Bri */

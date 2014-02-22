@@ -138,6 +138,7 @@ public:
 #ifdef _DEBUG
   void DumpTextureUse();
 #endif
+  static void MaybeAnnounceNewFocus();
 private:
   void RenderPass();
 
