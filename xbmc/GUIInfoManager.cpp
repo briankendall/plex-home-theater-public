@@ -5943,7 +5943,7 @@ void CGUIInfoManager::GetCurrentControlInfo(CurrentControlInfo &info)
                         
                         if (panel) {
                             info.itemCount = panel->GetNumItems();
-                            info.rowCount = panel->GetRows() / panel->GetItemsPerRow();
+                            info.rowCount = panel->GetRows();
                             info.columnCount = panel->GetItemsPerRow();
                             info.row = panel->GetSelectedItem() / panel->GetItemsPerRow();
                             info.column = panel->GetSelectedItem() % panel->GetItemsPerRow();
