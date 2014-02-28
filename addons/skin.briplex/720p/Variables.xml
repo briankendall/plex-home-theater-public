@@ -1,0 +1,6 @@
+<?xml version="1.0"?>
+<variable name="Padded_Episode">
+    <value condition="IntegerGreaterThan(ListItem.Episode,9)">$INFO[ListItem.Episode]</value>
+    <value condition="!IntegerGreaterThan(ListItem.Episode,9)">$INFO[ListItem.Episode,0]</value>
+</variable>
+
