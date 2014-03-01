@@ -244,11 +244,11 @@
 								<visible>Window.IsActive(mysharedcontent)</visible>
 							</control>
 							<!-- Bri Bri note: this is the upper left poster -->
-							<control type="image">
-								<include>ListItemFullInfoThumbSize</include>
-								<texture background="true">$INFO[ListItem.Property(Fanart_Image)]</texture>
-								<visible>!IsEmpty(ListItem.Property(Fanart_Image)) + !Container.Content(homemovies) + !Container.Content(photos) + !Container.Content(artists) | [Container.Content(channel) + !ListItem.Type(photo)] + [Container.Content(channel) + !ListItem.Type(clip) + !ListItem.Type(episode)]</visible>
-							</control>
+							<!-- <control type="image"> -->
+							<!-- 	<include>ListItemFullInfoThumbSize</include> -->
+							<!-- 	<texture background="true">$INFO[ListItem.Property(Fanart_Image)]</texture> -->
+							<!-- 	<visible>!IsEmpty(ListItem.Property(Fanart_Image)) + !Container.Content(homemovies) + !Container.Content(photos) + !Container.Content(artists) | [Container.Content(channel) + !ListItem.Type(photo)] + [Container.Content(channel) + !ListItem.Type(clip) + !ListItem.Type(episode)]</visible> -->
+							<!-- </control> -->
 							<control type="image">
 									<posy>30</posy>
 									<posx>20</posx>

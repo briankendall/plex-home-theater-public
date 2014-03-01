@@ -546,7 +546,7 @@
 				<align>center</align>
 				<aligny>center</aligny>
 				<scroll>false</scroll>
-				<label>$INFO[ListItem.tvshowtitle]_ddd</label>
+				<label>$INFO[ListItem.tvshowtitle]</label>
 				<font>Regular-16</font>
 				<textcolor>FF999999</textcolor>
 				<wrapmultiline>false</wrapmultiline>
@@ -594,7 +594,7 @@
 				<align>center</align>
 				<aligny>center</aligny>
 				<scroll>false</scroll>
-				<label>$INFO[ListItem.tvshowtitle]_eee</label>
+				<label>$INFO[ListItem.tvshowtitle]</label>
 				<font>Regular-16</font>
 				<textcolor>FFFFFFFF</textcolor>
 				<wrapmultiline>false</wrapmultiline>
@@ -1460,7 +1460,7 @@
 							</control>
 							<control type="label">
 								<align>left</align>
-								<label> &#xB7; $INFO[Container(9004).ListItem(0).Title]_blah_fff</label>
+								<label> &#xB7; $INFO[Container(9004).ListItem(0).Title]</label>
 								<font>SearchResult</font>
 								<scroll>false</scroll>
 								<textcolor>orange</textcolor>

@@ -278,7 +278,7 @@
 		<height>20</height>
 		<align>left</align>
 		<aligny>center</aligny>
-		<label>$INFO[ListItem.TVShowTitle]_aaa</label>
+		<label>$INFO[ListItem.TVShowTitle]</label>
 		<font>Regular-14</font>
 		<shadowcolor>ff222222</shadowcolor>
 	</include>
@@ -290,7 +290,7 @@
 		<height>20</height>
 		<align>left</align>
 		<aligny>center</aligny>
-		<label>$INFO[ListItem.Label]_bbb</label>
+		<label>$INFO[ListItem.Label]</label>
 		<font>Regular-14</font>
 		<shadowcolor>ff222222</shadowcolor>
 	</control>

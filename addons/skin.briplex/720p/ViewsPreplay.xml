@@ -790,7 +790,7 @@
 				<control type="label">
 					<width>570</width>
 					<height>44</height>
-					<label>$INFO[ListItem.TVShowTitle]_ggg</label>
+					<label>$INFO[ListItem.TVShowTitle]</label>
 					<font>Bold-36</font>
 					<include>WhiteShadow</include>
 					<visible>true</visible>
