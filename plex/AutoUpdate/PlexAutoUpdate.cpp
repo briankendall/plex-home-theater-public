@@ -36,9 +36,9 @@ using namespace XFILE;
 CPlexAutoUpdate::CPlexAutoUpdate()
   : m_forced(false), m_isSearching(false), m_isDownloading(false), m_ready(false), m_percentage(0)
 {
-  m_url = CURL("https://my.plexapp.com/updater/products/2/check.xml");
+  m_url = CURL("https://plex.tv/updater/products/2/check.xml");
 
-  m_searchFrequency = 86400000; /* default to 24h */
+  m_searchFrequency = 21600000; /* 6 hours */
 
   CheckInstalledVersion();
 
@@ -147,7 +147,7 @@ void CPlexAutoUpdate::OnTimeout()
 
     if (m_forced)
     {
-      CGUIDialogKaiToast::QueueNotification(CGUIDialogKaiToast::Info, "Update available!", "A new version downloading in the background", 10000, false);
+      CGUIDialogKaiToast::QueueNotification(CGUIDialogKaiToast::Info, "Update available!", "A new version is downloading in the background", 10000, false);
       m_forced = false;
     }
     return;

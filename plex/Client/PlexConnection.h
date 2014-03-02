@@ -34,7 +34,7 @@ public:
   };
 
   CPlexConnection() {}
-  CPlexConnection(int type, const CStdString& host, int port, const CStdString& token="");
+  CPlexConnection(int type, const CStdString& host, int port, const CStdString& schema="http", const CStdString& token="");
 
   static CStdString ConnectionTypeName(ConnectionType type);
   static CStdString ConnectionStateName(ConnectionState state);
@@ -83,9 +83,6 @@ public:
 
   int m_type;
 
-  void save(TiXmlNode* server);
-  static CPlexConnectionPtr load(TiXmlElement* element);
-
   XFILE::CCurlFile m_http;
 
 private:
@@ -102,15 +99,10 @@ class CMyPlexConnection : public CPlexConnection
 {
   public:
     CMyPlexConnection()
-    : CPlexConnection(CPlexConnection::CONNECTION_MYPLEX, "my.plexapp.com", 443) {}
+    : CPlexConnection(CPlexConnection::CONNECTION_MYPLEX, "plex.tv", 443, "https") {}
 
     virtual CStdString GetAccessToken() const
     {
       return g_plexApplication.myPlexManager->GetAuthToken();
-    }
-
-    virtual CStdString GetAccessTokenParameter() const
-    {
-      return "auth_token";
     }
 };

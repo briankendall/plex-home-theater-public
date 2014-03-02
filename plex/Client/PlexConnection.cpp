@@ -6,17 +6,14 @@
 
 using namespace XFILE;
 
-CPlexConnection::CPlexConnection(int type, const CStdString& host, int port, const CStdString& token) :
+CPlexConnection::CPlexConnection(int type, const CStdString& host, int port, const CStdString& schema, const CStdString& token) :
   m_type(type), m_state(CONNECTION_STATE_UNKNOWN), m_token(token)
 {
   m_url.SetHostName(host);
   m_url.SetPort(port);
-  m_refreshed = true;
-  if (port == 443)
-    m_url.SetProtocol("https");
-  else
-    m_url.SetProtocol("http");
+  m_url.SetProtocol(schema);
 
+  m_refreshed = true;
   m_http.SetTimeout(3);
 }
 
@@ -116,41 +113,7 @@ CPlexConnection::ConnectionTypeName(CPlexConnection::ConnectionType type)
   if (type & CONNECTION_MANUAL)
     typeName += "(manual)";
   if (type & CONNECTION_MYPLEX)
-    typeName += "(myplex)";
+    typeName += "(plex.tv)";
 
   return typeName;
-}
-
-void CPlexConnection::save(TiXmlNode* server)
-{
-  TiXmlElement conn("connection");
-
-  conn.SetAttribute("host", m_url.GetHostName().c_str());
-  conn.SetAttribute("port", m_url.GetPort());
-  conn.SetAttribute("token", m_token.c_str());
-  conn.SetAttribute("type", m_type);
-
-  server->InsertEndChild(conn);
-}
-
-CPlexConnectionPtr CPlexConnection::load(TiXmlElement *element)
-{
-  int port, type;
-  std::string host, token;
-
-  if (element->QueryStringAttribute("host", &host) != TIXML_SUCCESS)
-    return CPlexConnectionPtr();
-
-  if (element->QueryStringAttribute("token", &token) != TIXML_SUCCESS)
-    return CPlexConnectionPtr();
-
-  if (element->QueryIntAttribute("port", &port) != TIXML_SUCCESS)
-    return CPlexConnectionPtr();
-
-  if (element->QueryIntAttribute("type", &type) != TIXML_SUCCESS)
-    return CPlexConnectionPtr();
-
-  CPlexConnectionPtr connection = CPlexConnectionPtr(new CPlexConnection(type, host, port, token));
-
-  return connection;
 }

@@ -13,6 +13,7 @@
 #include "FileSystem/PlexDirectory.h"
 #include "utils/StringUtils.h"
 #include "PlexApplication.h"
+#include "GUISettings.h"
 
 #define DEFAULT_PORT 32400
 
@@ -20,6 +21,7 @@ CMyPlexManager::EMyPlexError CMyPlexScanner::DoScan()
 {
   CPlexServerPtr myplex = g_plexApplication.serverManager->FindByUUID("myplex");
   CURL url = myplex->BuildPlexURL("pms/servers");
+  url.SetOption("includeLite", "1");
 
   XFILE::CPlexDirectory dir;
   CFileItemList list;
@@ -40,6 +42,14 @@ CMyPlexManager::EMyPlexError CMyPlexScanner::DoScan()
     CFileItemPtr serverItem = list.Get(i);
     if (serverItem && serverItem->GetPlexDirectoryType() == PLEX_DIR_TYPE_SERVER)
     {
+      bool synced = serverItem->GetProperty("synced").asBoolean();
+
+      if (synced && g_guiSettings.GetBool("myplex.hidecloudsync"))
+      {
+        CLog::Log(LOGDEBUG, "CMyPlexScanner::DoScan hiding cloudsync server");
+        continue;
+      }
+
       CStdString uuid = serverItem->GetProperty("machineIdentifier").asString();
       CStdString name = serverItem->GetProperty("name").asString();
       bool owned = serverItem->GetProperty("owned").asBoolean();
@@ -55,13 +65,17 @@ CMyPlexManager::EMyPlexError CMyPlexScanner::DoScan()
       CStdString address = serverItem->GetProperty("address").asString();
       CStdString token = serverItem->GetProperty("accessToken").asString();
       CStdString localAddresses = serverItem->GetProperty("localAddresses").asString();
+      CStdString schema = serverItem->GetProperty("scheme").asString();
       int port = serverItem->GetProperty("port").asInteger();
 
-      if (address.empty() || token.empty())
+      if (token.empty())
         continue;
 
-      CPlexConnectionPtr connection = CPlexConnectionPtr(new CPlexConnection(CPlexConnection::CONNECTION_MYPLEX, address, port, token));
-      server->AddConnection(connection);
+      if (!address.empty())
+      {
+        CPlexConnectionPtr connection = CPlexConnectionPtr(new CPlexConnection(CPlexConnection::CONNECTION_MYPLEX, address, port, schema, token));
+        server->AddConnection(connection);
+      }
 
       /* only add localConnections for non-shared servers */
       if (owned && !localAddresses.empty())
@@ -69,7 +83,7 @@ CMyPlexManager::EMyPlexError CMyPlexScanner::DoScan()
         CStdStringArray addressList = StringUtils::SplitString(localAddresses, ",", 0);
         BOOST_FOREACH(CStdString laddress, addressList)
         {
-          CPlexConnectionPtr lconn = CPlexConnectionPtr(new CPlexConnection(CPlexConnection::CONNECTION_MYPLEX, laddress, DEFAULT_PORT, token));
+          CPlexConnectionPtr lconn = CPlexConnectionPtr(new CPlexConnection(CPlexConnection::CONNECTION_MYPLEX, laddress, DEFAULT_PORT, schema, token));
           server->AddConnection(lconn);
         }
       }

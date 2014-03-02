@@ -48,6 +48,7 @@
 #include "Application.h"
 #include "FileItem.h"
 #include "Variant.h"
+#include "PlexUtils.h"
 /* END PLEX */
 
 using namespace XFILE;
@@ -221,14 +222,10 @@ CCurlFile::CReadState::CReadState()
   m_sendRange = true;
   m_headerdone = false;
 
-#ifndef TARGET_WINDOWS
-  m_hasTicklePipe = true;
-  if (::pipe(m_ticklePipe) == -1)
-  {
-    CLog::Log(LOGWARNING, "CCurlFile::CReadState::CReadState failed when creating a pipe!");
-    m_hasTicklePipe = false;
-  }
-#endif
+  /* PLEX */
+  m_hasTicklePipe = PlexUtils::MakeWakeupPipe(m_ticklePipe);
+  CLog::Log(LOGDEBUG, "CCurlFile::CReadState::CReadState Has ticklePipe %s", m_hasTicklePipe ? "YES" : "NO");
+  /* END PLEX */
 }
 
 CCurlFile::CReadState::~CReadState()
@@ -239,15 +236,13 @@ CCurlFile::CReadState::~CReadState()
     g_curlInterface.easy_release(&m_easyHandle, &m_multiHandle);
 
   /* PLEX */
-#ifndef TARGET_WINDOWS
   if (m_hasTicklePipe)
   {
     ::shutdown(m_ticklePipe[0], 2);
-    ::close(m_ticklePipe[0]);
+    ::closesocket(m_ticklePipe[0]);
     ::shutdown(m_ticklePipe[1], 2);
-    ::close(m_ticklePipe[1]);
+    ::closesocket(m_ticklePipe[1]);
   }
-#endif
   /* END PLEX */
 }
 
@@ -1492,7 +1487,6 @@ bool CCurlFile::CReadState::FillBuffer(unsigned int want)
         struct timeval t = { timeout / 1000, (timeout % 1000) * 1000 };
 
         /* PLEX */
-#ifndef TARGET_WINDOWS
         // Add the tickle pipe
         if (maxfd != -1 && m_hasTicklePipe)
         {
@@ -1500,7 +1494,6 @@ bool CCurlFile::CReadState::FillBuffer(unsigned int want)
           if (m_ticklePipe[0] > maxfd)
             maxfd = m_ticklePipe[0];
         }
-#endif
         /* END PLEX */
 
 
@@ -1514,18 +1507,20 @@ bool CCurlFile::CReadState::FillBuffer(unsigned int want)
         }
 
         /* PLEX */
-#ifndef TARGET_WINDOWS
         // Read the byte from the tickle socket if there was one
         if (m_hasTicklePipe)
         {
           if (FD_ISSET(m_ticklePipe[0], &fdread))
           {
-            CLog::Log(LOGINFO, "The curl loop was woken up.");
+            CLog::Log(LOGINFO, "CCurlFile::CReadState::FillBuffer [%s] terminated", m_url.c_str());
             char theTickleByte;
+#ifdef TARGET_WINDOWS
+            ::recv(m_ticklePipe[0], &theTickleByte, 1, 0);
+#else
             ::read(m_ticklePipe[0], &theTickleByte, 1);
+#endif
           }
         }
-#endif
         /* END PLEX */
 
       }

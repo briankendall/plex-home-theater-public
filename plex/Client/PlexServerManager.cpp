@@ -16,6 +16,7 @@
 #include "settings/GUISettings.h"
 
 #include "PlexApplication.h"
+#include "PlexServerCacheDatabase.h"
 
 using namespace std;
 
@@ -174,12 +175,12 @@ CPlexServerManager::UpdateFromDiscovery(CPlexServerPtr server)
   
   CSingleLock lk(m_serverManagerLock);
 
-  MergeServer(server);
-  NotifyAboutServer(server);
-  SetBestServer(server, false);
+  CPlexServerPtr mergedServer = MergeServer(server);
+  NotifyAboutServer(mergedServer);
+  SetBestServer(mergedServer, false);
 }
 
-void
+CPlexServerPtr
 CPlexServerManager::MergeServer(CPlexServerPtr server)
 {
   CSingleLock lk(m_serverManagerLock);
@@ -191,11 +192,13 @@ CPlexServerManager::MergeServer(CPlexServerPtr server)
     CLog::Log(LOGDEBUG, "CPlexServerManager::MergeServer Merged %s with %d connection, now we have %d total connections.",
               server->GetName().c_str(), server->GetNumConnections(),
               existingServer->GetNumConnections());
+    return existingServer;
   }
   else
   {
     m_serverMap[server->GetUUID()] = server;
     CLog::Log(LOGDEBUG, "CPlexServerManager::MergeServer Added a new server %s with %d connections", server->GetName().c_str(), server->GetNumConnections());
+    return server;
   }
 }
 
@@ -267,8 +270,6 @@ CPlexServerManager::ClearBestServer()
 
 void CPlexServerManager::ServerReachabilityDone(CPlexServerPtr server, bool success)
 {
-  if (m_stopped) return;
-
   int reachThreads = 0;
 
   {
@@ -323,65 +324,34 @@ CPlexServerManager::NotifyAboutServer(CPlexServerPtr server, bool added)
 
 void CPlexServerManager::save()
 {
-  CXBMCTinyXML xml;
-  TiXmlElement srvmgr("serverManager");
-  srvmgr.SetAttribute("version", PLEX_SERVER_MANAGER_XML_FORMAT_VERSION);
-
-  if (m_bestServer)
-    srvmgr.SetAttribute("bestServer", m_bestServer->GetUUID().c_str());
-
-  TiXmlNode *root = xml.InsertEndChild(srvmgr);
-
   CSingleLock lk(m_serverManagerLock);
-
-  BOOST_FOREACH(PlexServerPair p, m_serverMap)
+  CPlexServerCacheDatabase db;
+  if (db.Open())
   {
-    p.second->save(root);
+    db.cacheServers();
+    db.Close();
   }
-
-  xml.SaveFile(PLEX_SERVER_MANAGER_XML_FILE);
 }
 
 void CPlexServerManager::load()
 {
-  /* now load our saved state */
-  if (XFILE::CFile::Exists(PLEX_SERVER_MANAGER_XML_FILE))
+  CSingleLock lk(m_serverManagerLock);
+
+  CPlexServerCacheDatabase db;
+  if (db.Open())
   {
-    CXBMCTinyXML doc;
-    if (doc.LoadFile(PLEX_SERVER_MANAGER_XML_FILE))
+    PlexServerList list;
+    if (db.getCachedServers(list))
     {
-      TiXmlElement* element = doc.FirstChildElement();
-      if (!element)
-        return;
-
-      std::string bestServer;
-      element->QueryStringAttribute("bestServer", &bestServer);
-
-      element = element->FirstChildElement();
-
-      while (element)
+      BOOST_FOREACH(CPlexServerPtr server, list)
       {
-        CPlexServerPtr server = CPlexServer::load(element);
-        if (server)
-        {
-          CLog::Log(LOGDEBUG, "CPlexServerManager::load got server %s from xml file", server->GetName().c_str());
-          m_serverMap[server->GetUUID()] = server;
-          NotifyAboutServer(server);
-        }
-
-        element = element->NextSiblingElement();
+        CLog::Log(LOGDEBUG, "CPlexServerManager::load found cached server %s", server->GetName().c_str());
+        m_serverMap[server->GetUUID()] = server;
       }
-
-      if (!bestServer.empty())
-        SetBestServer(FindByUUID(bestServer), true);
     }
-    else
-    {
-      CLog::Log(LOGWARNING, "CPlexServerManager::load failed to open %s: %s", PLEX_SERVER_MANAGER_XML_FILE, doc.ErrorDesc());
-    }
-
-    CLog::Log(LOGDEBUG, "CPlexServerManager::load Got %ld servers from plexservermanager.xml", m_serverMap.size());
+    db.Close();
   }
+  lk.unlock();
 
   m_manualServerManager.checkManualServersAsync();
 }
@@ -390,8 +360,24 @@ void CPlexServerManager::load()
 void CPlexServerManager::Stop()
 {
   m_stopped = true;
+  save();
+
+  CLog::Log(LOGDEBUG, "CPlexServerManager::Stop asked to stop...");
+
+  CSingleLock lk(m_serverManagerLock);
+
   if (IsRunningReachabilityTests())
   {
+    CLog::Log(LOGDEBUG, "CPlexServerManager::Stop still running reachability tests...");
+    std::pair<std::string, CPlexServerReachabilityThread*> p;
+    BOOST_FOREACH(p, m_reachabilityThreads)
+    {
+      CLog::Log(LOGDEBUG, "CPlexServerManager::Stop canceling reachtests for server %s", p.second->m_server->GetName().c_str());
+      p.second->m_server->CancelReachabilityTests();
+    }
+
+    lk.unlock();
+
     if (!m_reachabilityTestEvent.WaitMSec(10 * 1000))
     {
       CLog::Log(LOGWARNING, "CPlexServerManager::Stop waited 10 seconds for the reachability stuff to finish, will just kill and move on.");

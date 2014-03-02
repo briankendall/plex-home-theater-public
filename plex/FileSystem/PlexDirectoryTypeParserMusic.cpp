@@ -17,7 +17,7 @@
 using namespace MUSIC_INFO;
 
 void
-CPlexDirectoryTypeParserAlbum::Process(CFileItem &item, CFileItem &mediaContainer, TiXmlElement *itemElement)
+CPlexDirectoryTypeParserAlbum::Process(CFileItem &item, CFileItem &mediaContainer, XML_ELEMENT *itemElement)
 {
   CAlbum album;
 
@@ -49,7 +49,11 @@ CPlexDirectoryTypeParserAlbum::Process(CFileItem &item, CFileItem &mediaContaine
   if (!item.HasArt(PLEX_ART_THUMB))
     item.SetArt(PLEX_ART_THUMB, mediaContainer.GetArt(PLEX_ART_THUMB));
 
-  for (TiXmlElement *el = itemElement->FirstChildElement(); el; el = el->NextSiblingElement())
+  #ifdef USE_RAPIDXML
+  for (XML_ELEMENT *el = itemElement->first_node(); el; el = el->next_sibling())
+  #else
+  for (XML_ELEMENT *el = itemElement->FirstChildElement(); el; el = el->NextSiblingElement())
+  #endif
   {
     CFileItemPtr tagItem = XFILE::CPlexDirectory::NewPlexElement(el, item, item.GetPath());
 
@@ -82,7 +86,7 @@ void CPlexDirectoryTypeParserAlbum::ParseTag(CFileItem &item, CFileItem &tagItem
 }
 
 void
-CPlexDirectoryTypeParserTrack::Process(CFileItem &item, CFileItem &mediaContainer, TiXmlElement *itemElement)
+CPlexDirectoryTypeParserTrack::Process(CFileItem &item, CFileItem &mediaContainer, XML_ELEMENT *itemElement)
 {
   CSong song;
 
@@ -138,7 +142,10 @@ CPlexDirectoryTypeParserTrack::Process(CFileItem &item, CFileItem &mediaContaine
   if (item.m_mediaItems.size() > 0)
   {
     CFileItemPtr firstMedia = item.m_mediaItems[0];
-    item.m_mapProperties.insert(firstMedia->m_mapProperties.begin(), firstMedia->m_mapProperties.end());
+    const PropertyMap pMap = firstMedia->GetAllProperties();
+    std::pair<CStdString, CVariant> p;
+    BOOST_FOREACH(p, pMap)
+      item.SetProperty(p.first, p.second);
 
     if (firstMedia->m_mediaParts.size() > 0)
       song.strFileName = firstMedia->m_mediaParts[0]->GetPath();
@@ -147,7 +154,7 @@ CPlexDirectoryTypeParserTrack::Process(CFileItem &item, CFileItem &mediaContaine
   item.SetFromSong(song);
 }
 
-void CPlexDirectoryTypeParserArtist::Process(CFileItem &item, CFileItem &mediaContainer, TiXmlElement *itemElement)
+void CPlexDirectoryTypeParserArtist::Process(CFileItem &item, CFileItem &mediaContainer, XML_ELEMENT *itemElement)
 {
   CArtist artist;
 
@@ -165,7 +172,11 @@ void CPlexDirectoryTypeParserArtist::Process(CFileItem &item, CFileItem &mediaCo
   item.GetMusicInfoTag()->SetArtist(artist);
 
   int thumbIdx = 0;
-  for (TiXmlElement *el = itemElement->FirstChildElement(); el; el = el->NextSiblingElement())
+  #ifdef USE_RAPIDXML
+  for (XML_ELEMENT *el = itemElement->first_node(); el; el = el->next_sibling())
+  #else
+  for (XML_ELEMENT *el = itemElement->FirstChildElement(); el; el = el->NextSiblingElement())
+  #endif
   {
     CFileItemPtr tagItem = XFILE::CPlexDirectory::NewPlexElement(el, item, item.GetPath());
 

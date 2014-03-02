@@ -6,6 +6,8 @@
 //
 //
 
+#include <boost/asio.hpp>
+
 #include "PlexMediaServerClient.h"
 
 #include <boost/lexical_cast.hpp>
@@ -28,6 +30,12 @@
 #include "utils/log.h"
 #include "PlexApplication.h"
 #include "PlexServerManager.h"
+#include "GUISettings.h"
+#include "StringUtils.h"
+#include "URIUtils.h"
+#include "PlexServer.h"
+#include "PlexFile.h"
+#include "NetworkInterface.h"
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 CURL CPlexMediaServerClient::GetItemURL(CFileItemPtr item)
@@ -77,6 +85,53 @@ void CPlexMediaServerClient::share(const CFileItemPtr &item, const CStdString &n
   u.SetOption("message", message);
 
   AddJob(new CPlexMediaServerClientJob(u, "POST"));
+}
+
+///////////////////////////////////////////////////////////////////////////////////////////////////
+void CPlexMediaServerClient::publishDevice()
+{
+  CStdString path;
+  path.Format("devices/%s", g_guiSettings.GetString("system.uuid"));
+
+  CPlexServerPtr myPlexServer = g_plexApplication.serverManager->FindByUUID("myplex");
+  if (!myPlexServer)
+    return;
+
+  CURL u = myPlexServer->BuildURL(path);
+
+  std::vector<NetworkInterface> allInterfaces;
+  NetworkInterface::GetCachedList(allInterfaces);
+  CStdStringArray interfaceOptions;
+
+  BOOST_FOREACH(NetworkInterface& xface, allInterfaces)
+  {
+    if (xface.loopback() == false && boost::starts_with(xface.name(), "v") == false)
+    {
+      // Avoid APIPA addresses.
+      if (boost::starts_with(xface.address(), "169.254.") == false)
+      {
+        CURL deviceAddr;
+        deviceAddr.SetProtocol("http");
+        deviceAddr.SetHostName(xface.address());
+        deviceAddr.SetPort(boost::lexical_cast<int>(g_guiSettings.GetString("services.webserverport")));
+        CLog::Log(LOGDEBUG, "CPlexMediaServerClient::publishDevice Adding interface: %s for publishing", deviceAddr.Get().c_str());
+
+        CStdString opt;
+        opt.Format("%s=%s", CURL::Encode("Connection[][uri]"), CURL::Encode(deviceAddr.Get()));
+
+        interfaceOptions.push_back(opt);
+      }
+    }
+  }
+
+  CStdString optList;
+  StringUtils::JoinString(interfaceOptions, "&", optList);
+
+  CStdString url = u.Get() + "&" + optList;
+
+  CLog::Log(LOGDEBUG, "CPlexMediaServerClient::publishDevice Going to call url: %s", url.c_str());
+
+  AddJob(new CPlexMediaServerClientJob(url, "PUT"));
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////

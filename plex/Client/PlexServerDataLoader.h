@@ -12,6 +12,7 @@
 #include "FileItem.h"
 #include "plex/PlexTypes.h"
 #include "threads/Timer.h"
+#include "FileSystem/PlexDirectory.h"
 
 /* Maps UUID->list of sections for the section */
 typedef std::map<CStdString, CFileItemListPtr> ServerDataMap;
@@ -47,6 +48,8 @@ class CPlexServerDataLoader : public CJobQueue, public IPlexGlobalTimeout, publi
     CFileItemPtr GetSection(const CURL &sectionUrl);
     EPlexDirectoryType GetSectionType(const CURL &sectionUrl);
 
+    CStdString TimerName() const { return "serverDataLoader"; }
+
   private:
     bool m_stopped;
     void OnTimeout();
@@ -78,6 +81,9 @@ class CPlexServerDataLoaderJob : public CJob
 
     /* we retain this so it won't go away from under us */
     CPlexServerDataLoaderPtr m_loader;
+    XFILE::CPlexDirectory m_dir;
+
+    virtual void Cancel() { m_dir.CancelDirectory(); }
 
     virtual bool operator==(const CJob* job) const
     {

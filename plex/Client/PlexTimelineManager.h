@@ -33,7 +33,7 @@ class CPlexTimelineManager : public IPlexGlobalTimeout
 
     CPlexTimelineManager();
 
-    void ReportProgress(const CFileItemPtr &currentItem, MediaState state, uint64_t currentPosition=0, bool force=false);
+    void ReportProgress(const CFileItemPtr &newItem, MediaState state, uint64_t currentPosition=0, bool force=false);
     std::vector<CUrlOptions> GetCurrentTimeLines(int commandID = -1);
     CXBMCTinyXML GetCurrentTimeLinesXML(CPlexRemoteSubscriberPtr subscriber);
     CUrlOptions GetCurrentTimeline(CPlexTimelineManager::MediaType type, bool forServer=true);
@@ -55,6 +55,8 @@ class CPlexTimelineManager : public IPlexGlobalTimeout
 
     std::string GetCurrentFocusedTextField() const { return m_textFieldName; }
     bool IsTextFieldFocused() const { return m_textFieldFocused; }
+
+    CStdString TimerName() const { return "timelineManager"; }
 
   private:
     void OnTimeout();

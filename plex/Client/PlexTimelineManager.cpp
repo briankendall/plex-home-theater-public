@@ -262,9 +262,10 @@ CUrlOptions CPlexTimelineManager::GetCurrentTimeline(MediaType type, bool forSer
       }
     }
 
-    std::string location = "navigation";
     if (m_currentStates[type] != MEDIA_STATE_STOPPED)
     {
+      std::string location = "navigation";
+
       int currentWindow = g_windowManager.GetActiveWindow();
       if (g_application.IsPlayingFullScreenVideo())
         location = "fullScreenVideo";
@@ -272,9 +273,9 @@ CUrlOptions CPlexTimelineManager::GetCurrentTimeline(MediaType type, bool forSer
         location = "fullScreenPhoto";
       else if (currentWindow == WINDOW_NOW_PLAYING || currentWindow == WINDOW_VISUALISATION)
         location = "fullScreenMusic";
-    }
 
-    options.AddOption("location", location);
+      options.AddOption("location", location);
+    }
 
     if (g_application.IsPlaying() && g_application.m_pPlayer)
     {
@@ -290,25 +291,37 @@ CUrlOptions CPlexTimelineManager::GetCurrentTimeline(MediaType type, bool forSer
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////
-void CPlexTimelineManager::ReportProgress(const CFileItemPtr &currentItem, CPlexTimelineManager::MediaState state, uint64_t currentPosition, bool force)
+void CPlexTimelineManager::ReportProgress(const CFileItemPtr &newItem, CPlexTimelineManager::MediaState state, uint64_t currentPosition, bool force)
 {
-  if (!currentItem)
+  if (!newItem)
     return;
 
-  MediaType type = GetMediaType(currentItem);
+  MediaType type = GetMediaType(newItem);
   if (type == UNKNOWN)
   {
-    CLog::Log(LOGDEBUG, "PlexTimelineManager::ReportProgress unknown item %s", currentItem->GetPath().c_str());
+    CLog::Log(LOGDEBUG, "PlexTimelineManager::ReportProgress unknown item %s", newItem->GetPath().c_str());
     return;
   }
 
   bool stateChange = false;
 
-  if (currentItem != m_currentItems[type])
+  CLog::Log(LOGDEBUG, "PlexTimelineManager::ReportProgress reporting for %s, current is %s", newItem->GetLabel().c_str(), m_currentItems[type] ? m_currentItems[type]->GetLabel().c_str() : "none");
+
+  if (!m_currentItems[type] || newItem->GetPath() != m_currentItems[type]->GetPath())
   {
-    m_currentItems[type] = currentItem;
+    if (m_currentStates[type] != MEDIA_STATE_STOPPED && m_currentItems[type])
+    {
+      // we need to stop the old media before playing the new one.
+      CLog::Log(LOGDEBUG, "CPlexTimelineManager::ReportProgress Old item was never stopped, sending stop timeline now.");
+      ReportProgress(m_currentItems[type], MEDIA_STATE_STOPPED, m_currentItems[type]->GetProperty("viewOffset").asInteger(), true);
+    }
+    /* we need a copy */
+    m_currentItems[type] = CFileItemPtr(new CFileItem(*newItem.get()));
     stateChange = true;
   }
+
+  /* now se the correct item, since we might have copied it */
+  CFileItemPtr currentItem = m_currentItems[type];
 
   if (state != m_currentStates[type])
   {
@@ -327,7 +340,7 @@ void CPlexTimelineManager::ReportProgress(const CFileItemPtr &currentItem, CPlex
       currentItem->SetProperty("viewOffset", currentPosition);
 
     if (g_plexApplication.m_preplayItem &&
-        g_plexApplication.m_preplayItem->GetLabel() == currentItem->GetLabel() &&
+        g_plexApplication.m_preplayItem->GetPath() == currentItem->GetPath() &&
         g_plexApplication.m_preplayItem->GetProperty("viewOffset").asInteger() != currentPosition)
       g_plexApplication.m_preplayItem->SetProperty("viewOffset", currentPosition);
   }
@@ -335,14 +348,16 @@ void CPlexTimelineManager::ReportProgress(const CFileItemPtr &currentItem, CPlex
   if (g_plexApplication.remoteSubscriberManager->hasSubscribers() &&
       (stateChange || m_subTimer.elapsedMs() >= 950))
   {
-    CLog::Log(LOGDEBUG, "CPlexTimelineManager::ReportProgress updating subscribers.");
+    CLog::Log(LOGDEBUG, "CPlexTimelineManager::ReportProgress updating subscribers: (%s) %s [%lld/%lld]",
+              StateToString(m_currentStates[type]).c_str(), currentItem->GetLabel().c_str(), currentPosition, GetItemDuration(m_currentItems[type]));
     NotifyPollers();
     SendTimelineToSubscribers();
     m_subTimer.restart();
   }
 
   int serverTimeout = 9950; /* default to 10 seconds for local servers */
-  CPlexServerPtr server = g_plexApplication.serverManager->FindFromItem(m_currentItems[type]);
+
+  CPlexServerPtr server = g_plexApplication.serverManager->FindFromItem(currentItem);
 
   if (server && (server->GetUUID() == "myplex" || server->GetUUID() == "node"))
     serverTimeout = 9950 * 3; // 30 seconds for myPlex or node
@@ -351,8 +366,9 @@ void CPlexTimelineManager::ReportProgress(const CFileItemPtr &currentItem, CPlex
 
   if (force || stateChange || m_serverTimer.elapsedMs() >= serverTimeout)
   {
-    CLog::Log(LOGDEBUG, "CPlexTimelineManager::ReportProgress updating server");
-    g_plexApplication.mediaServerClient->SendServerTimeline(m_currentItems[type], GetCurrentTimeline(type));
+    CLog::Log(LOGDEBUG, "CPlexTimelineManager::ReportProgress updating server: (%s) %s [%lld/%lld]",
+              StateToString(m_currentStates[type]).c_str(), currentItem->GetLabel().c_str(), currentPosition, GetItemDuration(currentItem));
+    g_plexApplication.mediaServerClient->SendServerTimeline(currentItem, GetCurrentTimeline(type));
 
     /* now we can see if we need to ping the transcoder as well */
     if (type == VIDEO && state == MEDIA_STATE_PAUSED && currentItem &&
@@ -470,6 +486,7 @@ CXBMCTinyXML CPlexTimelineManager::GetCurrentTimeLinesXML(CPlexRemoteSubscriberP
   CXBMCTinyXML doc;
   doc.LinkEndChild(new TiXmlDeclaration("1.0", "utf-8", ""));
   TiXmlElement *mediaContainer = new TiXmlElement("MediaContainer");
+  mediaContainer->SetAttribute("location", "navigation"); // default
   if (m_textFieldFocused)
   {
     mediaContainer->SetAttribute("textFieldFocused", std::string(m_textFieldName));

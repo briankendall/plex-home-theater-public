@@ -24,6 +24,7 @@ class CPlexHTTPFetchJob : public CJob
     CPlexHTTPFetchJob(const CURL &url) : CJob(), m_url(url) {};
   
     bool DoWork();
+    void Cancel() { m_http.Cancel(); }
     virtual bool operator==(const CJob* job) const;
   
     XFILE::CCurlFile m_http;
@@ -48,6 +49,11 @@ public:
   virtual const char* GetType() const { return "plexdirectoryfetch"; }
   
   virtual bool DoWork();
+
+  virtual void Cancel()
+  {
+    m_dir.CancelDirectory();
+  }
   
   XFILE::CPlexDirectory m_dir;
   CFileItemList m_items;
@@ -77,6 +83,9 @@ public:
   CGUIMessage m_msg;
   CStdString m_postData;
   int m_errorMsg;
+  XFILE::CPlexFile m_http;
+
+  virtual void Cancel() { m_http.Cancel(); }
 
   /* set this to the shared ptr if we are calling this from the
    * mediaServerClient, otherwise just don't bother */
@@ -116,9 +125,12 @@ class CPlexDownloadFileJob : public CJob
       CJob(), m_failed(false), m_url(url), m_destination(destination)
     {};
 
+    virtual void Cancel() { m_http.Cancel(); }
+
     bool DoWork();
     CStdString m_url;
     CStdString m_destination;
+    XFILE::CCurlFile m_http;
 
     bool m_failed;
 };

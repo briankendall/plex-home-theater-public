@@ -35,8 +35,8 @@ class CPlexServerConnTestThread : public CThread
 class CPlexServer : public boost::enable_shared_from_this<CPlexServer>
 {
 public:
-  CPlexServer(const CStdString& uuid, const CStdString& name, bool owned)
-    : m_owned(owned), m_uuid(uuid), m_name(name) {}
+  CPlexServer(const CStdString& uuid, const CStdString& name, bool owned, bool synced = false)
+    : m_owned(owned), m_uuid(uuid), m_name(name), m_synced(synced) {}
 
   CPlexServer() {}
 
@@ -50,6 +50,9 @@ public:
   void Merge(CPlexServerPtr otherServer);
 
   bool UpdateReachability();
+  void CancelReachabilityTests();
+
+  CStdString GetAccessToken() const;
 
   CStdString GetName() const { return m_name; }
   CStdString GetUUID() const { return m_uuid; }
@@ -58,6 +61,7 @@ public:
   CStdString GetServerClass() const { return m_serverClass; }
   bool GetOwned() const { return m_owned; }
   bool IsComplete() const { return m_complete; }
+  bool GetSynced() const { return m_synced; }
 
   CPlexServerPtr GetShared() { return shared_from_this(); }
   CPlexConnectionPtr GetActiveConnection() const;
@@ -76,6 +80,14 @@ public:
   void AddConnection(CPlexConnectionPtr connection);
 
   void SetOwner(const CStdString &owner) { m_owner = owner; }
+  void SetVersion(const CStdString& version) { m_version = version; }
+  void SetSupportsVideoTranscoding(bool support) { m_supportsVideoTranscoding = support; }
+  void SetSupportsAudioTranscoding(bool support) { m_supportsAudioTranscoding = support; }
+  void SetSupportsDeletion(bool support) { m_supportsDeletion = support; }
+
+  void SetTranscoderQualities(std::vector<std::string>& qualties) { m_transcoderQualities = qualties; }
+  void SetTranscoderBitrates(std::vector<std::string>& bitrates) { m_transcoderQualities = bitrates; }
+  void SetTranscoderResolutions(std::vector<std::string>& resolutions) { m_transcoderResolutions = resolutions; }
   
   std::vector<std::string> GetTranscoderQualities() const { return m_transcoderQualities; }
   std::vector<std::string> GetTranscoderBitrates() const { return m_transcoderBitrates; }
@@ -87,14 +99,15 @@ public:
   
   bool HasAuthToken() const;
   std::string GetAnyToken() const;
-  
-  void save(TiXmlNode* parent);
-  static CPlexServerPtr load(TiXmlElement* element);
-  
+    
   void SetActiveConnection(CPlexConnectionPtr connection) { m_activeConnection = connection; }
+
+  uint64_t GetLastRefreshed() const { return m_lastRefreshed; }
+  void DidRefresh() { m_lastRefreshed = XbmcThreads::SystemClockMillis(); }
 
 private:
   bool m_owned;
+  bool m_synced;
   CStdString m_uuid;
   CStdString m_name;
   CStdString m_version;
@@ -125,4 +138,6 @@ private:
 
   CCriticalSection m_connTestThreadLock;
   std::vector<CPlexServerConnTestThread*> m_connTestThreads;
+
+  uint64_t m_lastRefreshed;
 };

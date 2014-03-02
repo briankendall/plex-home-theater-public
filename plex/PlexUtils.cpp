@@ -537,3 +537,89 @@ CStdString PlexUtils::GetXMLString(const CXBMCTinyXML &document)
 
   return printer.Str();
 }
+
+///////////////////////////////////////////////////////////////////////////////////////////////////
+bool PlexUtils::MakeWakeupPipe(SOCKET *pipe)
+{
+#ifdef TARGET_POSIX
+  if (::pipe(pipe) != 0)
+  {
+    CLog::Log(LOGWARNING, "PlexUtils::MakeWakeupPipe failed to create a POSIX pipe");
+    return false;
+  }
+#else
+  pipe[0] = ::socket(AF_INET, SOCK_DGRAM, 0);
+  if (pipe[0] == -1)
+  {
+    CLog::Log(LOGWARNING, "PlexUtils::MakeWakeupPipe failed to create UDP socket");
+    return false;
+  }
+
+  struct sockaddr_in inAddr;
+  struct sockaddr addr;
+
+  memset((char*)&inAddr, 0, sizeof(inAddr));
+  memset((char*)&addr, 0, sizeof(addr));
+
+  inAddr.sin_family = AF_INET;
+  inAddr.sin_port = htons(0);
+  inAddr.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
+
+  int y = 1;
+  if (::setsockopt(pipe[0], SOL_SOCKET, SO_REUSEADDR, (const char*)&y, sizeof(y)) == -1)
+  {
+    CLog::Log(LOGWARNING, "PlexUtils::MakeWakeupPipe failed to set socket options");
+    return false;
+  }
+
+  if (::bind(pipe[0], (struct sockaddr *)&inAddr, sizeof(inAddr)) == -1)
+  {
+    CLog::Log(LOGWARNING, "PlexUtils::MakeWakeupPipe failed to bind socket!");
+    return false;
+  }
+
+  int len = sizeof(addr);
+  if (::getsockname(pipe[0], &addr, &len) != 0)
+  {
+    CLog::Log(LOGWARNING, "PlexUtils::MakeWakeupPipe failed to getsockname on socket");
+    return false;
+  }
+
+  pipe[1] = ::socket(AF_INET, SOCK_DGRAM, 0);
+  if (pipe[1] == -1)
+  {
+    CLog::Log(LOGWARNING, "PlexUtils::MakeWakeupPipe failed to create other end of UDP pipe");
+    return false;
+  }
+
+  if (connect(pipe[1], &addr, len) != 0)
+  {
+    CLog::Log(LOGWARNING, "PlexUtils::MakeWakeupPipe failed to connect UDP pipe.");
+    return false;
+  }
+#endif
+  return true;
+}
+
+///////////////////////////////////////////////////////////////////////////////////////////////////
+#if defined(HAVE_EXECINFO_H)
+void PlexUtils::LogStackTrace(char *FuncName)
+{
+  void *buffer[100];
+  char **strings;
+  int  nptrs;
+
+   nptrs = backtrace(buffer, 100);
+   strings = backtrace_symbols(buffer, nptrs);
+   if (strings)
+   {
+     CLog::Log(LOGDEBUG,"Stacktrace for function %s", FuncName);
+     for (int j = 0; j < nptrs; j++)
+         CLog::Log(LOGDEBUG,"%s\n", strings[j]);
+
+     free(strings);
+   }
+}
+#else
+void PlexUtils::LogStackTrace(char *FuncName) {}
+#endif

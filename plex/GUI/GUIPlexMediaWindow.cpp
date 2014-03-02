@@ -38,11 +38,15 @@
 #include "Client/PlexServerDataLoader.h"
 #include "dialogs/GUIDialogYesNo.h"
 #include "Client/PlexExtraInfoLoader.h"
+#include "ViewDatabase.h"
+#include "ViewState.h"
 
 #include "LocalizeStrings.h"
 #include "DirectoryCache.h"
 
 #define XMIN(a,b) ((a)<(b)?(a):(b))
+
+//#define USE_PAGING 1
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 bool CGUIPlexMediaWindow::OnMessage(CGUIMessage &message)
@@ -95,12 +99,14 @@ bool CGUIPlexMediaWindow::OnMessage(CGUIMessage &message)
 
     case GUI_MSG_ITEM_SELECT:
     {
+#ifdef USE_PAGING
       int currentIdx = m_viewControl.GetSelectedItem();
       if (currentIdx > m_pagingOffset && m_currentJobId == -1)
       {
         /* the user selected something in the middle of where we loaded, let's just cheat and fill in everything */
         LoadPage(m_pagingOffset, currentIdx + PLEX_DEFAULT_PAGE_SIZE);
       }
+#endif
       break;
     }
 
@@ -151,7 +157,33 @@ bool CGUIPlexMediaWindow::OnMessage(CGUIMessage &message)
     {
       InsertPage((CFileItemList*)message.GetPointer());
     }
-      
+
+    case GUI_MSG_CHANGE_VIEW_MODE:
+    {
+      int viewMode = 0;
+      if (message.GetParam1())  // we have an id
+        viewMode = m_viewControl.GetViewModeByID(message.GetParam1());
+      else if (message.GetParam2())
+        viewMode = m_viewControl.GetNextViewMode((int)message.GetParam2());
+
+      g_plexApplication.mediaServerClient->SetViewMode(CFileItemPtr(new CFileItem(*m_vecItems)), viewMode);
+      CLog::Log(LOGDEBUG, "CGUIMediaWindow::OnMessage updating viewMode to %d", viewMode);
+      m_vecItems->SetProperty("viewMode", viewMode);
+      g_directoryCache.ClearDirectory(m_vecItems->GetPath());
+
+      CViewDatabase db;
+      if (db.Open())
+      {
+        CViewState state;
+        state.m_viewMode = viewMode;
+
+        db.SetViewState(m_sectionRoot.Get(), GetID(), state, g_guiSettings.GetString("lookandfeel.skin"));
+        db.Close();
+      }
+
+      UpdateButtons();
+      break;
+    }
   }
 
   return ret;
@@ -160,6 +192,7 @@ bool CGUIPlexMediaWindow::OnMessage(CGUIMessage &message)
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 void CGUIPlexMediaWindow::InsertPage(CFileItemList* items)
 {
+#ifdef USE_PAGING
   int nItem = m_viewControl.GetSelectedItem();
   CStdString strSelected;
   if (nItem >= 0)
@@ -177,6 +210,7 @@ void CGUIPlexMediaWindow::InsertPage(CFileItemList* items)
   m_viewControl.SetSelectedItem(strSelected);
 
   delete items;
+#endif
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////
@@ -486,6 +520,7 @@ bool CGUIPlexMediaWindow::OnAction(const CAction &action)
 
   bool ret = CGUIMediaWindow::OnAction(action);
 
+#ifdef USE_PAGING
   if ((action.GetID() > ACTION_NONE &&
       action.GetID() <= ACTION_PAGE_DOWN) ||
       action.GetID() >= KEY_ASCII) // KEY_ASCII means that we letterjumped.
@@ -495,6 +530,7 @@ bool CGUIPlexMediaWindow::OnAction(const CAction &action)
     else if (m_viewControl.GetSelectedItem() >= (m_pagingOffset - (PLEX_DEFAULT_PAGE_SIZE/2)))
       LoadNextPage();
   }
+#endif
 
   return ret;
 }
@@ -503,9 +539,13 @@ bool CGUIPlexMediaWindow::OnAction(const CAction &action)
 bool CGUIPlexMediaWindow::GetDirectory(const CStdString &strDirectory, CFileItemList &items)
 {
   CURL u(strDirectory);
+#ifdef USE_PAGING
   u.SetProtocolOption("containerStart", "0");
   u.SetProtocolOption("containerSize", boost::lexical_cast<std::string>(PLEX_DEFAULT_PAGE_SIZE));
   m_pagingOffset = PLEX_DEFAULT_PAGE_SIZE - 1;
+#else
+  m_pagingOffset = -1;
+#endif
 
   if (u.GetProtocol() == "plexserver" &&
       (u.GetHostName() != "channels" && u.GetHostName() != "shared" && u.GetHostName() != "channeldirectory"))
@@ -526,6 +566,7 @@ bool CGUIPlexMediaWindow::GetDirectory(const CStdString &strDirectory, CFileItem
   if (server && server->GetActiveConnection() && server->GetActiveConnection()->IsLocal())
     g_directoryCache.ClearDirectory(u.Get());
   
+#ifdef USE_PAGING
   if (items.HasProperty("totalSize"))
   {
     if (items.GetProperty("totalSize").asInteger() > PLEX_DEFAULT_PAGE_SIZE)
@@ -567,6 +608,7 @@ bool CGUIPlexMediaWindow::GetDirectory(const CStdString &strDirectory, CFileItem
       }
     }
   }
+#endif
   return ret;
 }
 
@@ -646,12 +688,15 @@ bool CGUIPlexMediaWindow::OnSelect(int iItem)
       item->GetPlexDirectoryType() == PLEX_DIR_TYPE_SHOW)
   {
     CPlexSectionFilterPtr filter = g_plexApplication.filterManager->getFilterForSection(m_sectionRoot.Get());
-    CPlexSecondaryFilterPtr unwatchedFilter = filter->getSecondaryFilterOfName("unwatchedLeaves");
-    if (filter && filter->currentPrimaryFilter() == "all" && unwatchedFilter && unwatchedFilter->isSelected())
+    if (filter && filter->currentPrimaryFilter() == "all")
     {
-      CURL u(item->GetPath());
-      u.SetOption("unwatched", "1");
-      item->SetPath(u.Get());
+      CPlexSecondaryFilterPtr unwatchedFilter = filter->getSecondaryFilterOfName("unwatchedLeaves");
+      if (unwatchedFilter && unwatchedFilter->isSelected())
+      {
+        CURL u(item->GetPath());
+        u.SetOption("unwatched", "1");
+        item->SetPath(u.Get());
+      }
     }
   }
 
@@ -729,7 +774,7 @@ void CGUIPlexMediaWindow::GetContextButtons(int itemNumber, CContextButtons &but
   {
     CPlexServerPtr server = g_plexApplication.serverManager->FindByUUID(item->GetProperty("plexserver").asString());
     if (server && server->SupportsDeletion())
-      buttons.Add(CONTEXT_BUTTON_DELETE, 15015);
+      buttons.Add(CONTEXT_BUTTON_DELETE, 117);
   }
 }
 
@@ -958,6 +1003,29 @@ void CGUIPlexMediaWindow::CheckPlexFilters(CFileItemList &list)
       list.SetProperty("PlexPreplay", "yes");
     }
   }
+}
+
+///////////////////////////////////////////////////////////////////////////////////////////////////
+void CGUIPlexMediaWindow::UpdateButtons()
+{
+  CViewDatabase db;
+  int viewMode = -1;
+
+  if (db.Open())
+  {
+    CViewState state;
+    if (db.GetViewState(m_sectionRoot.Get(), GetID(), state, g_guiSettings.GetString("lookandfeel.skin")))
+    {
+      CLog::Log(LOGDEBUG, "GUIPlexMediaWindow::UpdateButtons got viewMode from db: %d", state.m_viewMode);
+      viewMode = state.m_viewMode;
+    }
+  }
+
+  if (viewMode == -1 && CurrentDirectory().HasProperty("viewMode"))
+    viewMode = (int)CurrentDirectory().GetProperty("viewMode").asInteger();
+
+  CLog::Log(LOGDEBUG, "CGUIMediaWindow::UpdateButtons setting viewMode to %d", viewMode);
+  m_viewControl.SetCurrentView(viewMode);
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////

@@ -43,6 +43,10 @@ if(TARGET_WIN32)
   set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} /SAFESEH:NO /DELAYLOAD:dnssd.dll /DELAYLOAD:dwmapi.dll /DELAYLOAD:libmicrohttpd-5.dll /DELAYLOAD:sqlite3.dll /DELAYLOAD:libsamplerate-0.dll /MANIFEST:NO")
 endif(TARGET_WIN32)
 
+OPTION(USE_RAPIDXML "Use RAPIDXML instead of TinyXML - Faster" ON)
+if(USE_RAPIDXML)
+  add_definitions(-DUSE_RAPIDXML)
+endif(USE_RAPIDXML)
 
 add_subdirectory(CrashReporter)
 add_subdirectory(Client)
@@ -222,15 +226,6 @@ install(DIRECTORY ${root}/addons DESTINATION ${RESOURCEPATH} COMPONENT RUNTIME
         PATTERN .git EXCLUDE
         PATTERN xbmc.python EXCLUDE
 )
-
-if(ENABLE_PYTHON AND TARGET_OSX)
-  install(DIRECTORY ${dependdir}/lib/python2.6 DESTINATION ${LIBPATH}/lib/ COMPONENT RUNTIME 
-    PATTERN python2.6/test EXCLUDE
-    REGEX .*\\.pyc$ EXCLUDE
-    REGEX .*\\.pyo$ EXCLUDE
-  )
-  install(FILES ${dependdir}/include/python2.6/pyconfig.h DESTINATION ${LIBPATH}/include/python2.6 COMPONENT RUNTIME)
-endif()
 
 if(NOT DEFINED PLEX_SPLASH)
   if(TARGET_RPI)
