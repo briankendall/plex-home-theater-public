@@ -22,22 +22,22 @@
 			<texture background="true">default-poster-small.png</texture>
 		</control>
 		<!-- Bri Bri note: these two are the selected item poster thumbnail -->
-		<!-- <control type="image"> -->
-		<!-- 	<include>PosListItem</include> -->
-		<!-- 	<width>53</width> -->
-		<!-- 	<height>80</height> -->
-		<!-- 	<aspectratio scalediffuse="false" align="center">scale</aspectratio> -->
-		<!-- 	<texture diffuse="mask-poster-small.png" background="true">$INFO[ListItem.Art(thumb)]</texture> -->
-		<!-- 	<visible>!ListItem.Type(episode)</visible> -->
-		<!-- </control> -->
-		<!-- <control type="image"> -->
-		<!-- 	<include>PosListItem</include> -->
-		<!-- 	<width>53</width> -->
-		<!-- 	<height>80</height> -->
-		<!-- 	<aspectratio scalediffuse="false" align="center">scale</aspectratio> -->
-		<!-- 	<texture diffuse="mask-poster-small.png" background="true">$INFO[ListItem.GrandparentThumb]</texture> -->
-		<!-- 	<visible>ListItem.Type(episode)</visible> -->
-		<!-- </control> -->
+		<control type="image">
+			<include>PosListItem</include>
+			<width>53</width>
+			<height>80</height>
+			<aspectratio scalediffuse="false" align="center">scale</aspectratio>
+			<texture diffuse="mask-poster-small.png" background="true">$INFO[ListItem.Art(thumb)]</texture>
+			<visible>!ListItem.Type(episode)</visible>
+		</control>
+		<control type="image">
+			<include>PosListItem</include>
+			<width>53</width>
+			<height>80</height>
+			<aspectratio scalediffuse="false" align="center">scale</aspectratio>
+			<texture diffuse="mask-poster-small.png" background="true">$INFO[ListItem.GrandparentThumb]</texture>
+			<visible>ListItem.Type(episode)</visible>
+		</control>
 	</include>
 	<include name="ListSquareItemThumb">
 		<control type="image">

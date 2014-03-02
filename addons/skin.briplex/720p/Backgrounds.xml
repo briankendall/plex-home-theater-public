@@ -24,13 +24,13 @@
 			<visible>Container.Content(empty)</visible>
 		</control>
 		<!-- Bri Bri note: this is the background poster image -->
-		<!-- <control type="largeimage"> -->
-		<!-- 	<include>FullScreenScaled</include> -->
-		<!-- 	<fadetime>400</fadetime> -->
-		<!-- 	<animation effect="fade" end="100" time="300" delay="0">Visible</animation> -->
-		<!-- 	<animation effect="fade" end="0" time="300" delay="0">Hidden</animation> -->
-		<!-- 	<texture background="true">$INFO[ListItem.Property(Fanart_Image)]</texture> -->
-		<!-- </control> -->
+		<control type="largeimage">
+			<include>FullScreenScaled</include>
+			<fadetime>400</fadetime>
+			<animation effect="fade" end="100" time="300" delay="0">Visible</animation>
+			<animation effect="fade" end="0" time="300" delay="0">Hidden</animation>
+			<texture background="true">$INFO[ListItem.Property(Fanart_Image)]</texture>
+		</control>
 		<control type="image">
 			<include>FullScreenScaled</include>
 			<texture>bg-overlay-grainy.png</texture>
