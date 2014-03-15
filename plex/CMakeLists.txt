@@ -15,6 +15,7 @@ include_directories(
 	${root}/plex/Network
 	${root}/plex/Remote
 	${root}/plex/Filters
+  ${root}/plex/Third-Party/rapidxml
   ${CONFIG_INCLUDE_PATH_SPARKLE}
 )
 
@@ -240,6 +241,7 @@ install(FILES ${plexdir}/Resources/${PLEX_SPLASH} DESTINATION ${RESOURCEPATH}/me
 install(DIRECTORY ${plexdir}/addons DESTINATION DESTINATION ${RESOURCEPATH} COMPONENT RUNTIME)
 install(FILES ${plexdir}/Resources/plex-icon-120.png DESTINATION ${RESOURCEPATH}/media COMPONENT RUNTIME)
 install(FILES ${plexdir}/Resources/plex-icon-256.png DESTINATION ${RESOURCEPATH}/media COMPONENT RUNTIME)
+install(FILES ${plexdir}/Resources/SlideshowOverlay.png DESTINATION ${RESOURCEPATH}/media COMPONENT RUNTIME)
 install(FILES ${plexdir}/Resources/peripherals.xml ${plexdir}/Resources/playercorefactory.xml DESTINATION ${RESOURCEPATH}/system COMPONENT RUNTIME)
 
 if(TARGET_OSX)

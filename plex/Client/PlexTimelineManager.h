@@ -10,43 +10,26 @@
 #include "FileItem.h"
 #include "Remote/PlexRemoteSubscriberManager.h"
 #include "utils/XBMCTinyXML.h"
+#include "PlexTimeline.h"
 
 #include <map>
+#include <queue>
 #include <boost/shared_ptr.hpp>
 
-class CPlexTimelineManager : public IPlexGlobalTimeout
+typedef std::map<ePlexMediaType, CPlexTimelinePtr> PlexTimelineMap;
+
+class CPlexTimelineManager
 {
   public:
-    enum MediaType {
-      MUSIC,
-      PHOTO,
-      VIDEO,
-      UNKNOWN
-    };
-
-    enum MediaState {
-      MEDIA_STATE_STOPPED,
-      MEDIA_STATE_PLAYING,
-      MEDIA_STATE_BUFFERING,
-      MEDIA_STATE_PAUSED
-    };
-
     CPlexTimelineManager();
 
-    void ReportProgress(const CFileItemPtr &newItem, MediaState state, uint64_t currentPosition=0, bool force=false);
-    std::vector<CUrlOptions> GetCurrentTimeLines(int commandID = -1);
-    CXBMCTinyXML GetCurrentTimeLinesXML(CPlexRemoteSubscriberPtr subscriber);
-    CUrlOptions GetCurrentTimeline(CPlexTimelineManager::MediaType type, bool forServer=true);
+    void ReportProgress(const CFileItemPtr &newItem, ePlexMediaState state, uint64_t currentPosition=0, bool force=false);
+    CPlexTimelineCollectionPtr GetCurrentTimeLines();
 
-    static std::string StateToString(MediaState state);
-    static std::string MediaTypeToString(CPlexTimelineManager::MediaType type);
-    CPlexTimelineManager::MediaType GetMediaType(CFileItemPtr item);
-    CPlexTimelineManager::MediaType GetMediaType(const CStdString &typestr);
-    CXBMCTinyXML WaitForTimeline(CPlexRemoteSubscriberPtr subscriber);
-    uint64_t GetItemDuration(CFileItemPtr item);
+    static uint64_t GetItemDuration(CFileItemPtr item);
 
-    void SendTimelineToSubscriber(CPlexRemoteSubscriberPtr subscriber);
-    void SendTimelineToSubscribers();
+    void SendTimelineToSubscriber(CPlexRemoteSubscriberPtr subscriber, const CPlexTimelineCollectionPtr &timelines);
+    void SendTimelineToSubscribers(const CPlexTimelineCollectionPtr &timelines, bool delay = false);
 
     void SetTextFieldFocused(bool focused, const CStdString &name="field", const CStdString &contents=CStdString(), bool isSecure=false);
     void UpdateLocation();
@@ -58,11 +41,15 @@ class CPlexTimelineManager : public IPlexGlobalTimeout
 
     CStdString TimerName() const { return "timelineManager"; }
 
+    void SendCurrentTimelineToSubscriber(CPlexRemoteSubscriberPtr subscriber);
+    bool GetTextFieldInfo(CStdString& name, CStdString& contents, bool& secure);
+
   private:
     void OnTimeout();
+    void ReportProgress(const CPlexTimelinePtr &timeline, bool force);
 
-    std::map<MediaType, CFileItemPtr> m_currentItems;
-    std::map<MediaType, MediaState> m_currentStates;
+    CCriticalSection m_timelineManagerLock;
+    CPlexTimelineMap m_timelines;
 
     CPlexTimer m_subTimer;
     CPlexTimer m_serverTimer;
@@ -74,6 +61,7 @@ class CPlexTimelineManager : public IPlexGlobalTimeout
     bool m_textFieldSecure;
 
     void NotifyPollers();
+    CPlexTimelinePtr ResetTimeline(ePlexMediaType type, bool continuing = false);
 };
 
 typedef boost::shared_ptr<CPlexTimelineManager> CPlexTimelineManagerPtr;

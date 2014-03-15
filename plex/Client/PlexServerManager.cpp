@@ -55,24 +55,6 @@ CPlexServerManager::CPlexServerManager() : m_stopped(false)
 
 }
 
-CPlexServerPtr CPlexServerManager::FindByHostAndPort(const CStdString &host, int port)
-{
-  CSingleLock lk(m_serverManagerLock);
-
-  BOOST_FOREACH(PlexServerPair p, m_serverMap)
-  {
-    vector<CPlexConnectionPtr> connections;
-    p.second->GetConnections(connections);
-    BOOST_FOREACH(CPlexConnectionPtr conn, connections)
-    {
-      if (conn->GetAddress().GetHostName().Equals(host) &&
-          conn->GetAddress().GetPort() == port)
-        return p.second;
-    }
-  }
-  return CPlexServerPtr();
-}
-
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 CPlexServerPtr CPlexServerManager::FindFromItem(CFileItemPtr item)
 {
@@ -253,11 +235,15 @@ CPlexServerManager::SetBestServer(CPlexServerPtr server, bool force)
   if (!m_bestServer || force || m_bestServer == server)
   {
     CLog::Log(LOGDEBUG, "CPlexServerManager::SetBestServer bestServer updated to %s", server->toString().c_str());
-    m_bestServer = server;
 
-    CGUIMessage msg(GUI_MSG_PLEX_BEST_SERVER_UPDATED, 0, 0);
-    msg.SetStringParam(server->GetUUID());
-    g_windowManager.SendThreadMessage(msg);
+    if (m_bestServer != server)
+    {
+      CGUIMessage msg(GUI_MSG_PLEX_BEST_SERVER_UPDATED, 0, 0);
+      msg.SetStringParam(server->GetUUID());
+      g_windowManager.SendThreadMessage(msg);
+    }
+
+    m_bestServer = server;
   }
 }
 

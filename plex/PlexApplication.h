@@ -59,6 +59,9 @@ class CPlexThumbCacher;
 class CPlexFilterManager;
 typedef boost::shared_ptr<CPlexFilterManager> CPlexFilterManagerPtr;
 
+class CPlexProfiler;
+typedef boost::shared_ptr<CPlexProfiler> CPlexProfilerPtr;
+
 class CPlexExtraInfoLoader;
 
 ///
@@ -98,6 +101,7 @@ public:
   CPlexTimelineManagerPtr timelineManager;  
   CPlexThumbCacher *thumbCacher;
   CPlexFilterManagerPtr filterManager;
+  CPlexProfilerPtr profiler;
   CPlexGlobalTimer timer;
   CPlexExtraInfoLoader *extraInfo;
 
@@ -105,8 +109,10 @@ public:
   void OnTimeout();
   CStdString TimerName() const { return "plexApplication"; }
   void sendNetworkLog(int level, const std::string& logline);
+  void Shutdown();
+  void preShutdown();
 
-private:
+  private:
   /// Members
   CPlexServiceListenerPtr m_serviceListener;
   CStdString m_ipAddress;

@@ -360,6 +360,7 @@
 #include "plex/GUI/GUIWindowPlexStartupHelper.h"
 #include "plex/PlexThemeMusicPlayer.h"
 #include "video/dialogs/GUIDialogVideoOSD.h"
+#include "plex/GUI/GUIPlexScreenSaverPhoto.h"
 /* END PLEX */
 
 #if defined(TARGET_ANDROID)
@@ -534,27 +535,11 @@ bool CApplication::OnEvent(XBMC_Event& newEvent)
       if (!g_application.m_bInitializing &&
           !g_advancedSettings.m_fullScreen)
       {
-        /* PLEX */
-#ifdef __PLEX__
-        int width = newEvent.resize.w;
-        int height = newEvent.resize.h;
-
-        // Maintain 16:9 AR.
-        height = width * 9 / 16;
-
-        g_Windowing.SetWindowResolution(width, height);
-        g_graphicsContext.SetVideoResolution(RES_WINDOW, true);
-        g_guiSettings.SetInt("window.width", width);
-        g_guiSettings.SetInt("window.height", height);
-        g_settings.Save();
-#else
         g_Windowing.SetWindowResolution(newEvent.resize.w, newEvent.resize.h);
         g_graphicsContext.SetVideoResolution(RES_WINDOW, true);
         g_guiSettings.SetInt("window.width", newEvent.resize.w);
         g_guiSettings.SetInt("window.height", newEvent.resize.h);
         g_settings.Save();
-#endif
-        /* END PLEX */
       }
       break;
     case XBMC_VIDEOMOVE:
@@ -1529,6 +1514,7 @@ bool CApplication::Initialize()
     g_windowManager.Add(new CGUIDialogPlexSubtitlePicker);
     g_windowManager.Add(new CGUIWindowPlexStartupHelper);
     g_windowManager.Add(new CGUIPlexPictureWindow);
+    g_windowManager.Add(new CGUIPlexScreenSaverPhoto);
     /* END PLEX */
 
     /* window id's 3000 - 3100 are reserved for python */
@@ -2430,8 +2416,12 @@ float CApplication::GetDimScreenSaverLevel() const
   if (!m_bScreenSave || !m_screenSaver ||
       (m_screenSaver->ID() != "screensaver.xbmc.builtin.dim" &&
        m_screenSaver->ID() != "screensaver.xbmc.builtin.black" &&
+       m_screenSaver->ID() != "screensaver.xbmc.builtin.plexphotos" &&
        !m_screenSaver->ID().empty()))
     return 0;
+
+  if (m_screenSaver->ID() == "screensaver.xbmc.builtin.plexphotos")
+    return 0.042f;
 
   if (!m_screenSaver->GetSetting("level").IsEmpty())
     return 100.0f - (float)atof(m_screenSaver->GetSetting("level"));
@@ -3827,6 +3817,10 @@ void CApplication::Stop(int exitCode)
     StopServices();
     //Sleep(5000);
 
+    /* PLEX */
+    g_plexApplication.preShutdown();
+    /* END PLEX */
+
 #ifdef HAS_WEB_SERVER
   CWebServer::UnregisterRequestHandler(&m_httpImageHandler);
   CWebServer::UnregisterRequestHandler(&m_httpVfsHandler);
@@ -3842,6 +3836,10 @@ void CApplication::Stop(int exitCode)
   CWebServer::UnregisterRequestHandler(&m_httpWebinterfaceHandler);
 #endif
 #endif
+
+  /* PLEX */
+  g_plexApplication.Shutdown();
+  /* END PLEX */
 
     if (m_pPlayer)
     {
@@ -4455,6 +4453,25 @@ bool CApplication::PlayFile(const CFileItem& item_, bool bRestart)
   // tell system we are starting a file
   m_bPlaybackStarting = true;
 
+  // for playing a new item, previous playing item's callback may already
+  // pushed some delay message into the threadmessage list, they are not
+  // expected be processed after or during the new item playback starting.
+  // so we clean up previous playing item's playback callback delay messages here.
+  int previousMsgsIgnoredByNewPlaying[] = {
+        GUI_MSG_PLAYBACK_STARTED,
+        GUI_MSG_PLAYBACK_ENDED,
+        GUI_MSG_PLAYBACK_STOPPED,
+        GUI_MSG_PLAYLIST_CHANGED,
+        GUI_MSG_PLAYLISTPLAYER_STOPPED,
+        GUI_MSG_PLAYLISTPLAYER_STARTED,
+        GUI_MSG_PLAYLISTPLAYER_CHANGED,
+        GUI_MSG_QUEUE_NEXT_ITEM,
+        0
+      };
+  int dMsgCount = g_windowManager.RemoveThreadMessageByMessageIds(&previousMsgsIgnoredByNewPlaying[0]);
+  if (dMsgCount > 0)
+    CLog::Log(LOGDEBUG,"%s : Ignored %d playback thread messages", __FUNCTION__, dMsgCount);
+
   // We should restart the player, unless the previous and next tracks are using
   // one of the players that allows gapless playback (paplayer, dvdplayer)
   if (m_pPlayer)
@@ -5012,6 +5029,9 @@ bool CApplication::WakeUpScreenSaver(bool bPowerOffKeyPressed /* = false */)
       if (g_settings.GetMasterProfile().getLockMode() != LOCK_MODE_EVERYONE &&
           (g_settings.UsingLoginScreen() || g_guiSettings.GetBool("masterlock.startuplock")) &&
           g_settings.GetCurrentProfile().getLockMode() != LOCK_MODE_EVERYONE &&
+          /* PLEX */
+          m_screenSaver->ID() != "screensaver.xbmc.builtin.plexphotos" &&
+          /* END PLEX */
           m_screenSaver->ID() != "screensaver.xbmc.builtin.dim" && m_screenSaver->ID() != "screensaver.xbmc.builtin.black" && !m_screenSaver->ID().empty() && m_screenSaver->ID() != "visualization")
       {
         m_iScreenSaveLock = 2;
@@ -5037,6 +5057,10 @@ bool CApplication::WakeUpScreenSaver(bool bPowerOffKeyPressed /* = false */)
       // we can just continue as usual from vis mode
       return false;
     }
+    /* PLEX */
+    else if (m_screenSaver->ID() == "screensaver.xbmc.builtin.plexphotos")
+      return true;
+    /* END PLEX */
     else if (m_screenSaver->ID() == "screensaver.xbmc.builtin.dim" || m_screenSaver->ID() == "screensaver.xbmc.builtin.black" || m_screenSaver->ID().empty())
       return true;
     else if (!m_screenSaver->ID().IsEmpty())
@@ -5153,6 +5177,10 @@ void CApplication::ActivateScreenSaver(bool forceType /*= false */)
     return;
   else if (m_screenSaver->ID() == "screensaver.xbmc.builtin.black")
     return;
+  /* PLEX */
+  else if (m_screenSaver->ID() == "screensaver.xbmc.builtin.plexphotos")
+    return;
+  /* END PLEX */
   else if (!m_screenSaver->ID().IsEmpty())
     g_windowManager.ActivateWindow(WINDOW_SCREENSAVER);
 }
@@ -6359,24 +6387,16 @@ void CApplication::UpdateFileState(const string& aState, bool force)
     return;
 
   // Compute the state if not passed on.
-  CPlexTimelineManager::MediaState state;
-  if (aState == "paused")
-    state = CPlexTimelineManager::MEDIA_STATE_PAUSED;
-  else if (aState == "playing")
-    state = CPlexTimelineManager::MEDIA_STATE_PLAYING;
-  else if (aState == "buffering")
-    state = CPlexTimelineManager::MEDIA_STATE_BUFFERING;
-  else if (aState == "stopped" )
-    state = CPlexTimelineManager::MEDIA_STATE_STOPPED;
-  else if (aState.empty())
-    state = IsBuffering() ? CPlexTimelineManager::MEDIA_STATE_BUFFERING : IsPaused() ? CPlexTimelineManager::MEDIA_STATE_PAUSED : CPlexTimelineManager::MEDIA_STATE_PLAYING;
+  ePlexMediaState state;
+  if (!aState.empty())
+    state = PlexUtils::GetMediaStateFromString(aState);
   else
-    return;
+    state = IsBuffering() ? PLEX_MEDIA_STATE_BUFFERING : IsPaused() ? PLEX_MEDIA_STATE_PAUSED : PLEX_MEDIA_STATE_PLAYING;
 
   if (!m_itemCurrentFile->HasProperty("duration"))
     m_itemCurrentFile->SetProperty("duration", GetTotalTime());
 
-  if (state == CPlexTimelineManager::MEDIA_STATE_STOPPED || IsPlayingVideo() || IsPlayingAudio())
+  if (state == PLEX_MEDIA_STATE_STOPPED || IsPlayingVideo() || IsPlayingAudio())
   {
     if (g_plexApplication.timelineManager)
       g_plexApplication.timelineManager->ReportProgress(m_itemCurrentFile, state, GetTime() * 1000, force);
