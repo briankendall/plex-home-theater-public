@@ -1,0 +1,34 @@
+2a3,7
+>     <!-- Bri Bri -->
+>     <variable name="Padded_Episode">
+>         <value condition="IntegerGreaterThan(ListItem.Episode,9)">$INFO[ListItem.Episode]</value>
+>         <value condition="!IntegerGreaterThan(ListItem.Episode,9)">$INFO[ListItem.Episode,0]</value>
+>     </variable>
+112a118
+> 		<!-- Bri Bri note: these two are the selected item poster thumbnail -->
+315c321,322
+< 							<label>[COLOR=greyLighter]$INFO[ListItem.TVShowTitle][/COLOR]$INFO[ListItem.Title, [COLOR=orange]&#xB7; [/COLOR]]</label>
+---
+> 							<!-- Bri Bri -->
+> 							<label>[COLOR=greyLighter]$INFO[ListItem.TVShowTitle][/COLOR][COLOR=greyLighter] $INFO[ListItem.Season, [COLOR=orange]&#xB7; [/COLOR]]x$VAR[Padded_Episode][/COLOR]$INFO[ListItem.Title, [COLOR=orange]&#xB7; [/COLOR]]</label>
+349a357,358
+> 							<!-- Bri Bri -->
+> 							<!-- <label>Season $INFO[ListItem.Season] Episode $INFO[ListItem.Episode]</label> -->
+372c381,383
+< 							<info>ListItem.Label</info>
+---
+> 							<!-- Bri Bri -->
+> 							<label>[COLOR=greyLighter]$INFO[ListItem.Season]x$VAR[Padded_Episode][/COLOR]$INFO[ListItem.Title, [COLOR=orange]&#xB7; [/COLOR]]</label>
+> 							<!-- <info>ListItem.Label</info> -->
+402c413,415
+< 							<info>ListItem.Label</info>
+---
+> 							<!-- <info>ListItem.Label</info> -->
+> 							<!-- Bri Bri -->
+> 							<label>$INFO[ListItem.Episode]. $INFO[ListItem.Label]</label>
+766c779,781
+< 							<info>ListItem.Label</info>
+---
+> 							<!-- <info>ListItem.Label</info> -->
+> 							<!-- Bri Bri -->
+> 							<label>$INFO[ListItem.Episode]. $INFO[ListItem.Label]</label>
