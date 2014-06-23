@@ -28,23 +28,27 @@
 #include "PlayList.h"
 #include "Settings.h"
 #include "AdvancedSettings.h"
+#include "PlexApplication.h"
 
 #include "GUIWindowNowPlaying.h"
 #include "PlexTypes.h"
 
 using namespace PLAYLIST;
 
-CGUIWindowNowPlaying::CGUIWindowNowPlaying() 
+///////////////////////////////////////////////////////////////////////////////////////////////////
+CGUIWindowNowPlaying::CGUIWindowNowPlaying()
   : CGUIWindow(WINDOW_NOW_PLAYING, "NowPlaying.xml")
 //  , m_thumbLoader(1, 200) TODO: figure out if we need to modify thumloader or not.
   , m_isFlipped(false)
 {
 }
 
+///////////////////////////////////////////////////////////////////////////////////////////////////
 CGUIWindowNowPlaying::~CGUIWindowNowPlaying()
 {
 }
 
+///////////////////////////////////////////////////////////////////////////////////////////////////
 bool CGUIWindowNowPlaying::OnAction(const CAction &action)
 {
   CStdString strAction = action.GetName();
@@ -55,63 +59,55 @@ bool CGUIWindowNowPlaying::OnAction(const CAction &action)
     g_windowManager.PreviousWindow();
     return true;
   }
-  else if (action.GetID() == ACTION_CONTEXT_MENU || action.GetID() == ACTION_SHOW_INFO)
-  {
-    return true;
-  }
   else if (action.GetID() == ACTION_SHOW_GUI ||
            action.GetID() == ACTION_NAV_BACK)
   {
     g_windowManager.PreviousWindow();
     return true;
   }
-  else if (strAction == "activatewindow(playercontrols)")
+  else if (action.GetID() == ACTION_NEXT_ITEM)
   {
+    g_playlistPlayer.PlayNext();
     return true;
   }
-  
-  return false;
+  else if (action.GetID() == ACTION_PREV_ITEM)
+  {
+    g_playlistPlayer.PlayPrevious();
+    return true;
+  }
+
+  return CGUIWindow::OnAction(action);
 }
 
+///////////////////////////////////////////////////////////////////////////////////////////////////
 bool CGUIWindowNowPlaying::OnMessage(CGUIMessage& message)
 {
   switch (message.GetMessage())
   {
     case GUI_MSG_WINDOW_DEINIT:
     {
-      if (m_thumbLoader.IsLoading())
-        m_thumbLoader.StopThread();
-      m_flipTimer.Stop();
+      g_plexApplication.timer->RemoveTimeout(this);
+      break;
     }
-    break;
-
     case GUI_MSG_WINDOW_INIT:
     {
-      CPlayList& playlist = g_playlistPlayer.GetPlaylist(PLAYLIST_MUSIC);
-      CFileItemList list;
-      
-      for (int i=0; i<playlist.size(); i++)
-        list.Add(playlist[i]);
-      
-      m_thumbLoader.Load(list);
-      
-      m_isFlipped = false;
-      m_flipTimer.StartZero();
-    }
-    break;
+      if (g_windowManager.GetTopMostModalDialogID(true) != WINDOW_INVALID)
+        g_windowManager.GetWindow(g_windowManager.GetTopMostModalDialogID(true))->Close();
 
+      m_isFlipped = false;
+      g_plexApplication.timer->SetTimeout(g_advancedSettings.m_nowPlayingFlipTime * 1000, this);
+      break;
+    }
   }
   
   return CGUIWindow::OnMessage(message);
 }
 
-void CGUIWindowNowPlaying::Render()
+///////////////////////////////////////////////////////////////////////////////////////////////////
+void CGUIWindowNowPlaying::OnTimeout()
 {
-  if (m_flipTimer.GetElapsedSeconds() >= g_advancedSettings.m_nowPlayingFlipTime)
-  {
-    m_isFlipped = !m_isFlipped;
-    g_infoManager.ResetCache();
-    m_flipTimer.Reset();
-  }
-  CGUIWindow::Render();
+  m_isFlipped = !m_isFlipped;
+  SetInvalid();
+
+  g_plexApplication.timer->RestartTimeout(g_advancedSettings.m_nowPlayingFlipTime * 1000, this);
 }

@@ -11,14 +11,13 @@ class CPlexNavigationHelper : public IJobCallback
 {
   public:
     CStdString navigateToItem(CFileItemPtr item, const CURL& parentURL = CURL(), int windowId = WINDOW_INVALID, bool swap = false);
-    bool CacheUrl(const std::string& url, bool& cancel, bool closeDialog = true);
+    bool CacheUrl(const std::string& url, bool& cancel);
+    static void navigateToNowPlaying();
 
-  private:
+private:
     void OnJobComplete(unsigned int jobID, bool success, CJob *job);
     CStdString ShowPluginSearch(CFileItemPtr item);
     void ShowPluginSettings(CFileItemPtr item);
-
-    CEvent m_cacheEvent;
     bool m_cacheSuccess;
 };
 

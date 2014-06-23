@@ -39,7 +39,7 @@ public:
   static CStdString ConnectionTypeName(ConnectionType type);
   static CStdString ConnectionStateName(ConnectionState state);
 
-  ConnectionState TestReachability(CPlexServerPtr server);
+  virtual ConnectionState TestReachability(CPlexServerPtr server);
   CURL BuildURL(const CStdString& path) const;
 
   bool IsLocal() const
@@ -79,7 +79,7 @@ public:
   void SetRefreshed(bool r) { m_refreshed = r; }
   bool GetRefreshed() const { return m_refreshed; }
 
-  bool operator== (const CPlexConnection &other);
+  bool Equals(const CPlexConnectionPtr &other);
 
   int m_type;
 

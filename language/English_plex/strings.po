@@ -857,6 +857,10 @@ msgctxt "#44300"
 msgid "Allow control of Plex/HT from Plex Clients"
 msgstr "Allow control of Plex/HT from Plex Clients"
 
+msgctxt "#44406"
+msgid "Use FFMPEG AVIO for Network transport"
+msgstr "Use FFMPEG AVIO for Network transport"
+
 #### These are error strings shown from channels
 #### errorcode + 50000
 msgctxt "#52000"
@@ -930,7 +934,7 @@ msgstr "Media Server went away"
 
 msgctxt "#52301"
 msgid "The Server you where browsing went away..."
-msgstr "The Server you where browsing went away..."
+msgstr "The Server you were browsing went away..."
 
 msgctxt "#52400"
 msgid "No linked social accounts"
@@ -975,3 +979,31 @@ msgstr "Allow Plex collect anonymous data to improve your experience"
 msgctxt "#52505"
 msgid "Hide CloudSync sections"
 msgstr "Hide CloudSync sections"
+
+msgctxt "#52600"
+msgid "Shuffle all"
+msgstr "Shuffle all"
+
+msgctxt "#52601"
+msgid "Play all"
+msgstr "Play all"
+
+msgctxt "#52602"
+msgid "Play Next"
+msgstr "Play Next"
+
+msgctxt "#52603"
+msgid "Add to Up Next"
+msgstr "Add to Up Next"
+
+msgctxt "#52604"
+msgid "Play Now?"
+msgstr "Play Now?"
+
+msgctxt "#52605"
+msgid "This will clear the contents of Up Next"
+msgstr "This will clear the contents of Up Next"
+
+msgctxt "#52606"
+msgid "and play the selection instead"
+msgstr "and play the selection instead"

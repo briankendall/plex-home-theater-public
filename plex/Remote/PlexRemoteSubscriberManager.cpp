@@ -49,11 +49,12 @@ void CPlexRemoteSubscriber::Process()
     if (!m_outgoingTimelines.waitPop(timelines) || !timelines)
       continue;
 
+    int numFails = 0;
     while (!sendTimeline(timelines))
     {
       CLog::Log(LOGWARNING, "CPlexRemoteSubscriber::sendTimeline failed to send timeline to %s", getName().c_str());
       Sleep(500);
-      if (m_bStop)
+      if ((++ numFails > 5) || m_bStop)
       {
         CLog::Log(LOGDEBUG, "CPlexRemoteSubcriber::Process aborting timeline thread for subscriber %s", getName().c_str());
         return;
@@ -165,6 +166,9 @@ CPlexRemoteSubscriberPtr CPlexRemoteSubscriberManager::addSubscriber(CPlexRemote
   }
   else
   {
+    g_application.WakeUpScreenSaverAndDPMS();
+    g_application.ResetSystemIdleTimer();
+
     m_map[subscriber->getUUID()] = subscriber;
     CLog::Log(LOGDEBUG, "CPlexRemoteSubscriberManager::addSubscriber added %s:%d [%s]",
               subscriber->getURL().GetHostName().c_str(), subscriber->getURL().GetPort(), subscriber->getUUID().c_str());
@@ -178,7 +182,7 @@ CPlexRemoteSubscriberPtr CPlexRemoteSubscriberManager::addSubscriber(CPlexRemote
       subscriber->Create();
   }
 
-  g_plexApplication.timer.SetTimeout(PLEX_REMOTE_SUBSCRIBER_CHECK_INTERVAL * 1000, this);
+  g_plexApplication.timer->SetTimeout(PLEX_REMOTE_SUBSCRIBER_CHECK_INTERVAL * 1000, this);
 
   return m_map[subscriber->getUUID()];
 }
@@ -207,7 +211,7 @@ void CPlexRemoteSubscriberManager::removeSubscriber(CPlexRemoteSubscriberPtr sub
   m_map.erase(subscriber->getUUID());
   
   if (m_map.size() == 0)
-    g_plexApplication.timer.RemoveTimeout(this);
+    g_plexApplication.timer->RemoveTimeout(this);
 
   if (!g_application.IsPlayingVideo())
     CGUIDialogKaiToast::QueueNotification(CGUIDialogKaiToast::Info, g_localizeStrings.Get(52501),
@@ -253,7 +257,7 @@ void CPlexRemoteSubscriberManager::OnTimeout()
   
   /* still clients to handle, restart the timer */
   if (m_map.size() > 0)
-    g_plexApplication.timer.SetTimeout(PLEX_REMOTE_SUBSCRIBER_CHECK_INTERVAL * 1000, this);
+    g_plexApplication.timer->SetTimeout(PLEX_REMOTE_SUBSCRIBER_CHECK_INTERVAL * 1000, this);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////
@@ -289,7 +293,7 @@ void CPlexRemoteSubscriberManager::Stop()
 {
   CSingleLock lock (m_crit);
   m_stopped = true;
-  g_plexApplication.timer.RemoveTimeout(this);
+  g_plexApplication.timer->RemoveTimeout(this);
 
   std::vector<CPlexRemoteSubscriberPtr> allSubs;
 

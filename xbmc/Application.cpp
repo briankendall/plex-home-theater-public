@@ -361,6 +361,10 @@
 #include "plex/PlexThemeMusicPlayer.h"
 #include "video/dialogs/GUIDialogVideoOSD.h"
 #include "plex/GUI/GUIPlexScreenSaverPhoto.h"
+#include "plex/Client/PlexTranscoderClient.h"
+#include "plex/GUI/GUIWindowPlexPlayQueue.h"
+#include "plex/Playlists/GUIDialogPlexPlayQueue.h"
+#include "plex/GUI/GUIDialogPlexError.h"
 /* END PLEX */
 
 #if defined(TARGET_ANDROID)
@@ -1416,7 +1420,9 @@ bool CApplication::Initialize()
     g_windowManager.Add(new CGUIDialogButtonMenu);
 #endif
     g_windowManager.Add(new CGUIDialogMuteBug);
+#ifndef __PLEX__
     g_windowManager.Add(new CGUIDialogPlayerControls);
+#endif
 #ifdef HAS_KARAOKE
     g_windowManager.Add(new CGUIDialogKaraokeSongSelectorSmall);
     g_windowManager.Add(new CGUIDialogKaraokeSongSelectorLarge);
@@ -1515,6 +1521,8 @@ bool CApplication::Initialize()
     g_windowManager.Add(new CGUIWindowPlexStartupHelper);
     g_windowManager.Add(new CGUIPlexPictureWindow);
     g_windowManager.Add(new CGUIPlexScreenSaverPhoto);
+    g_windowManager.Add(new CGUIWindowPlexPlayQueue);
+    g_windowManager.Add(new CGUIDialogPlexPlayQueue);
     /* END PLEX */
 
     /* window id's 3000 - 3100 are reserved for python */
@@ -3582,6 +3590,8 @@ bool CApplication::Cleanup()
     g_windowManager.Delete(WINDOW_DIALOG_PLEX_AUDIO_PICKER);
     g_windowManager.Delete(WINDOW_DIALOG_PLEX_SUBTITLE_PICKER);
     g_windowManager.Delete(WINDOW_PLEX_STARTUP_HELPER);
+    g_windowManager.Delete(WINDOW_PLEX_PLAY_QUEUE);
+    g_windowManager.Delete(WINDOW_DIALOG_PLEX_PLAYQUEUE);
     /* END PLEX */
 
     g_windowManager.Delete(WINDOW_MUSIC_PLAYLIST);
@@ -3765,6 +3775,8 @@ void CApplication::Stop(int exitCode)
 #ifndef __PLEX__
     SaveFileState(true);
 #else
+    g_audioManager.Enable(false);
+    g_audioManager.UnLoad();
     UpdateFileState("stopped");
 #endif
     
@@ -4246,17 +4258,28 @@ bool CApplication::PlayFile(const CFileItem& item_, bool bRestart)
   {
     CFileItem newItem;
     CPlexMediaDecisionEngine plexMDE;
-    if (plexMDE.BlockAndResolve(item, newItem))
+    if (plexMDE.resolveItem(item, newItem))
     {
-      newItem.SetProperty("viewOffset", item.GetProperty("viewOffset"));
-      newItem.m_lStartOffset = item.m_lStartOffset;
-      newItem.m_lEndOffset = item.m_lEndOffset;
+     // Matroska seeking check
+      if (CPlexTranscoderClient::getItemTranscodeMode(item) == CPlexTranscoderClient::PLEX_TRANSCODE_MODE_MKV)
+      {
+        if (item.HasProperty("viewOffsetSeek"))
+        {
+          // for Matroska seeking, redefine viewOffset from seeeking value and update item offset
+          int64_t offsetSeek = item.GetProperty("viewOffsetSeek").asInteger();
+
+          newItem.SetProperty("viewOffset", offsetSeek);
+          newItem.m_lStartOffset = item.m_lStartOffset = ((offsetSeek / 10) - newItem.m_lEndOffset) * 0.75;
+        }
+      }
 
       item = newItem;
 
       if (!m_itemCurrentFile->IsStack())
         *m_itemCurrentFile = newItem;
     }
+    else
+      return false;
 
     /* let's set some options if we need to */
     CFileItemPtr mediaPart = CPlexMediaDecisionEngine::getMediaPart(newItem);
@@ -4418,9 +4441,6 @@ bool CApplication::PlayFile(const CFileItem& item_, bool bRestart)
 #ifndef __PLEX__
   int playlist = g_playlistPlayer.GetCurrentPlaylist();
   if (item.IsVideo() && g_playlistPlayer.GetPlaylist(playlist).size() > 1)
-#else
-  if (item.IsVideo() && g_playlistPlayer.GetPlaylist(PLAYLIST_VIDEO).size() > 1)
-#endif
   { // playing from a playlist by the looks
     // don't switch to fullscreen if we are not playing the first item...
     options.fullscreen = !g_playlistPlayer.HasPlayedFirstFile() && g_advancedSettings.m_fullScreenOnMovieStart && !g_settings.m_bStartVideoWindowed;
@@ -4437,6 +4457,9 @@ bool CApplication::PlayFile(const CFileItem& item_, bool bRestart)
   }
   else
     options.fullscreen = g_advancedSettings.m_fullScreenOnMovieStart && !g_settings.m_bStartVideoWindowed;
+#else
+  options.fullscreen = g_advancedSettings.m_fullScreenOnMovieStart;
+#endif
 
   // reset m_bStartVideoWindowed as it's a temp setting
   g_settings.m_bStartVideoWindowed = false;
@@ -4531,6 +4554,11 @@ bool CApplication::PlayFile(const CFileItem& item_, bool bRestart)
     {
       if (g_windowManager.GetActiveWindow() == WINDOW_FULLSCREEN_VIDEO)
         g_windowManager.ActivateWindow(WINDOW_VISUALISATION);
+
+      /* PLEX */
+      if (!g_playlistPlayer.HasPlayedFirstFile())
+        ActivateVisualizer();
+      /* END PLEX */
     }
 
 #ifdef HAS_VIDEO_PLAYBACK
@@ -4556,6 +4584,13 @@ bool CApplication::PlayFile(const CFileItem& item_, bool bRestart)
       g_playlistPlayer.SetCurrentPlaylist(PLAYLIST_NONE);
 #endif
   }
+  /* PLEX */
+  else
+  {
+    CGUIDialogPlexError::ShowError(g_localizeStrings.Get(52000), g_localizeStrings.Get(52010), "", "");
+  }
+  /* END PLEX */
+
   m_bPlaybackStarting = false;
 
   if (bResult)
@@ -4576,18 +4611,7 @@ bool CApplication::PlayFile(const CFileItem& item_, bool bRestart)
       OnPlayBackStopped();
   }
 
-  /* PLEX */
-  // If we're supposed to activate the visualizer when playing audio, do so now.
-  if (IsPlayingAudio() &&
-      g_advancedSettings.m_bVisualizerOnPlay &&
-      !g_playlistPlayer.HasPlayedFirstFile() &&
-      !g_playlistPlayer.QueuedFirstFile())
-  {
-    ActivateVisualizer();
-  }
-
-  return bResult;
-  /* END PLEX */
+ return bResult;
 }
 
 void CApplication::OnPlayBackEnded()
@@ -4735,6 +4759,17 @@ void CApplication::OnPlayBackSeek(int iTime, int seekOffset)
   g_infoManager.SetDisplayAfterSeek(2500, seekOffset/1000);
 
   /* PLEX */
+  // define here viewOffsetSeek for Matroska transcoding seek & restart media
+  if (CurrentFileItemPtr())
+  {
+    if (CPlexTranscoderClient::getItemTranscodeMode(*CurrentFileItemPtr()) == CPlexTranscoderClient::PLEX_TRANSCODE_MODE_MKV)
+    {
+      CurrentFileItemPtr()->SetProperty("viewOffsetSeek",iTime);
+      CApplicationMessenger::Get().MediaRestart(false);
+    }
+  }
+  
+
   UpdateFileState("", true);
   /* END PLEX */
 }
@@ -5163,15 +5198,24 @@ void CApplication::ActivateScreenSaver(bool forceType /*= false */)
     if (g_windowManager.HasModalDialog() || (IsPlayingVideo() && g_guiSettings.GetBool("screensaver.usedimonpause")) || g_PVRManager.IsRunningChannelScan())
     {
       if (!CAddonMgr::Get().GetAddon("screensaver.xbmc.builtin.dim", m_screenSaver))
-        m_screenSaver.reset(new CScreenSaver(""));
+        m_screenSaver.reset(new CScreenSaver("screensaver.xbmc.builtin.dim"));
     }
     // Check if we are Playing Audio and Vis instead Screensaver!
+#ifndef __PLEX__
     else if (IsPlayingAudio() && g_guiSettings.GetBool("screensaver.usemusicvisinstead") && !g_guiSettings.GetString("musicplayer.visualisation").IsEmpty())
     { // activate the visualisation
       m_screenSaver.reset(new CScreenSaver("visualization"));
       g_windowManager.ActivateWindow(WINDOW_VISUALISATION);
       return;
     }
+#else
+    else if (IsPlayingAudio() && g_guiSettings.GetBool("screensaver.usemusicvisinstead"))
+    {
+      m_screenSaver.reset(new CScreenSaver("visualization"));
+      ActivateVisualizer();
+      return;
+    }
+#endif
   }
   if (m_screenSaver->ID() == "screensaver.xbmc.builtin.dim" || m_screenSaver->ID().empty())
     return;
@@ -5233,12 +5277,7 @@ bool CApplication::IsIdleShutdownInhibited() const
 
 bool CApplication::OnMessage(CGUIMessage& message)
 {
-  /* PLEX */
-  if (g_plexApplication.OnMessage(message))
-    return true;
-  /* END PLEX */
-
-  switch ( message.GetMessage() )
+ switch ( message.GetMessage() )
   {
   case GUI_MSG_NOTIFY_ALL:
     {
@@ -5699,6 +5738,25 @@ void CApplication::ProcessSlow()
     CAddonInstaller::Get().UpdateRepos();
 
   CAEFactory::GarbageCollect();
+
+  /* PLEX */
+  if (g_windowManager.GetActiveWindow() == WINDOW_FULLSCREEN_VIDEO && IsPlayingVideo())
+  {
+    CGUIDialogVideoOSD *osd = (CGUIDialogVideoOSD*)g_windowManager.GetWindow(WINDOW_DIALOG_VIDEO_OSD);
+    if (IsPaused() && !IsBuffering())
+    {
+      if (osd && !osd->IsDialogRunning())
+      {
+        ThreadMessage tmsg = {TMSG_DIALOG_DOMODAL, WINDOW_DIALOG_VIDEO_OSD, WINDOW_FULLSCREEN_VIDEO, "pauseOpen"};
+        CApplicationMessenger::Get().SendMessage(tmsg, false);
+      }
+    }
+    else if (IsPlaying() && osd && osd->IsDialogRunning() && osd->IsOpenedFromPause())
+    {
+      CApplicationMessenger::Get().Close(osd, false, false);
+    }
+  }
+  /* END PLEX */
 }
 
 // Global Idle Time in Seconds
@@ -5757,7 +5815,7 @@ void CApplication::Restart(bool bSamePosition)
   /* END PLEX */
 
   // do we want to return to the current position in the file
-  if (false == bSamePosition)
+  if ((false == bSamePosition) && (CPlexTranscoderClient::getItemTranscodeMode(*m_itemCurrentFile) != CPlexTranscoderClient::PLEX_TRANSCODE_MODE_MKV))
   {
     // no, then just reopen the file and start at the beginning
     PlayFile(*m_itemCurrentFile, true);

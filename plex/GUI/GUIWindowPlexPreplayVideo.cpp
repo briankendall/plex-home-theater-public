@@ -10,21 +10,25 @@
 #include "guilib/GUILabelControl.h"
 #include "ApplicationMessenger.h"
 #include "PlexApplication.h"
-#include "PlexContentPlayerMixin.h"
 #include "PlexThemeMusicPlayer.h"
 
 #include "dialogs/GUIDialogBusy.h"
+#include "dialogs/GUIDialogOK.h"
 #include "dialogs/GUIDialogKeyboardGeneric.h"
 #include "dialogs/GUIDialogYesNo.h"
 #include "PlexJobs.h"
 #include "Client/PlexServerManager.h"
+#include "guilib/GUIWindowManager.h"
+#include "LocalizeStrings.h"
+#include "PlexPlayQueueManager.h"
 
 #include "DirectoryCache.h"
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 CGUIWindowPlexPreplayVideo::CGUIWindowPlexPreplayVideo(void)
- : CGUIMediaWindow(WINDOW_PLEX_PREPLAY_VIDEO, "PlexPreplayVideo.xml")
+ : CGUIPlexMediaWindow(WINDOW_PLEX_PREPLAY_VIDEO, "PlexPreplayVideo.xml")
 {
+  m_navigating = false;
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////
@@ -70,11 +74,11 @@ bool CGUIWindowPlexPreplayVideo::OnMessage(CGUIMessage &message)
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 bool CGUIWindowPlexPreplayVideo::OnAction(const CAction &action)
 {
-  g_plexApplication.timer.RemoveAllTimeoutsByName("navigationTimeout");
+  g_plexApplication.timer->RemoveAllTimeoutsByName("navigationTimeout");
 
   if (action.GetID() == ACTION_PLAYER_PLAY)
   {
-    PlexContentPlayerMixin::PlayPlexItem(g_plexApplication.m_preplayItem);
+    g_plexApplication.playQueueManager->create(*g_plexApplication.m_preplayItem);
     return true;
   }
   else if (action.GetID() == ACTION_TOGGLE_WATCHED)
@@ -97,11 +101,11 @@ bool CGUIWindowPlexPreplayVideo::OnAction(const CAction &action)
     SetInvalid();
     return true;
   }
-  else if (action.GetID() == ACTION_MOVE_RIGHT)
+  else if (action.GetID() == ACTION_PLEX_MOVE_NEXT_ITEM)
   {
     MoveToItem(1);
   }
-  else if (action.GetID() == ACTION_MOVE_LEFT)
+  else if (action.GetID() == ACTION_PLEX_MOVE_PREV_ITEM)
   {
     MoveToItem(-1);
   }
@@ -112,6 +116,12 @@ bool CGUIWindowPlexPreplayVideo::OnAction(const CAction &action)
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 void CGUIWindowPlexPreplayVideo::MoveToItem(int idx)
 {
+  CSingleLock lk(m_navigationLock);
+  if (m_navigating) return;
+
+  m_navigating = true;
+  lk.Leave();
+
   CFileItemPtr item = m_vecItems->Get(0);
   if (item && item->GetPlexDirectoryType() == PLEX_DIR_TYPE_EPISODE)
   {
@@ -122,7 +132,7 @@ void CGUIWindowPlexPreplayVideo::MoveToItem(int idx)
       CURL u(item->GetProperty("parentKey").asString());
       PlexUtils::AppendPathToURL(u, "children");
 
-      if (m_navHelper.CacheUrl(u.Get(), cancel, false))
+      if (m_navHelper.CacheUrl(u.Get(), cancel))
       {
         CFileItemList list;
         if (GetDirectory(u.Get(), list))
@@ -133,7 +143,11 @@ void CGUIWindowPlexPreplayVideo::MoveToItem(int idx)
             {
               CFileItemPtr i2 = list.Get(i + idx);
               if (!i2)
+              {
+                lk.Enter();
+                m_navigating = false;
                 return;
+              }
 
               if (m_navHelper.CacheUrl(i2->GetPath(), cancel))
                 Update(i2->GetPath(), false);
@@ -143,6 +157,9 @@ void CGUIWindowPlexPreplayVideo::MoveToItem(int idx)
       }
     }
   }
+
+  lk.Enter();
+  m_navigating = false;
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////
@@ -150,26 +167,9 @@ void CGUIWindowPlexPreplayVideo::Recommend()
 {
   if (m_friends.Size() < 1)
   {
-    m_dataLoaded.Reset();
-
-    CJobManager::GetInstance().AddJob(new CPlexDirectoryFetchJob(CURL("plexserver://myplex/pms/friends/all.xml")), this, CJob::PRIORITY_HIGH);
-    CGUIDialogBusy* dialog = (CGUIDialogBusy*)g_windowManager.GetWindow(WINDOW_DIALOG_BUSY);
-
-    if (dialog)
-      dialog->Show();
-
-    while (true)
-    {
-      if (m_dataLoaded.WaitMSec(1))
-        break;
-
-      if (dialog && dialog->IsCanceled())
-        break;
-
-      g_windowManager.ProcessRenderLoop(false);
-    }
-
-    dialog->Close();
+    CJob* j = new CPlexDirectoryFetchJob(CURL("plexserver://myplex/pms/friends/all.xml"));
+    if (!g_plexApplication.busy.blockWaitingForJob(j, this))
+      return;
   }
 
   if (m_friends.Size() > 0)
@@ -186,26 +186,9 @@ void CGUIWindowPlexPreplayVideo::Share()
 {
   if (m_networks.Size() < 1)
   {
-    m_dataLoaded.Reset();
-
-    CJobManager::GetInstance().AddJob(new CPlexDirectoryFetchJob(CURL("plexserver://myplex/pms/social/networks.xml")), this, CJob::PRIORITY_HIGH);
-    CGUIDialogBusy* dialog = (CGUIDialogBusy*)g_windowManager.GetWindow(WINDOW_DIALOG_BUSY);
-
-    if (dialog)
-      dialog->Show();
-
-    while (true)
-    {
-      if (m_dataLoaded.WaitMSec(1))
-        break;
-
-      if (dialog && dialog->IsCanceled())
-        break;
-
-      g_windowManager.ProcessRenderLoop(false);
-    }
-
-    dialog->Close();
+    CJob* job = new CPlexDirectoryFetchJob(CURL("plexserver://myplex/pms/social/networks.xml"));
+    if (!g_plexApplication.busy.blockWaitingForJob(job, this))
+      return;
   }
 
   CFileItemList linkedNetworks;
@@ -281,9 +264,13 @@ void CGUIWindowPlexPreplayVideo::UpdateItem()
     m_vecItems->SetContent("clip");
 
   m_vecItems->SetProperty("PlexPreplay", "yes");
+  m_vecItems->SetProperty("PlexContent", PlexUtils::GetPlexContent(*m_vecItems));
 
-  g_plexApplication.m_preplayItem = m_vecItems->Get(0);
-  g_plexApplication.themeMusicPlayer->playForItem(*m_vecItems->Get(0));
+  if (m_vecItems->Size() > 0 && m_vecItems->Get(0))
+  {
+    g_plexApplication.m_preplayItem = m_vecItems->Get(0);
+    g_plexApplication.themeMusicPlayer->playForItem(*m_vecItems->Get(0));
+  }
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////
@@ -297,7 +284,6 @@ void CGUIWindowPlexPreplayVideo::OnJobComplete(unsigned int jobID, bool success,
     else if (fjob->m_url.GetFileName() == "pms/social/networks.xml")
       m_networks.Copy(fjob->m_items);
   }
-  m_dataLoaded.Set();
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////

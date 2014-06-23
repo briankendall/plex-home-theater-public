@@ -73,6 +73,31 @@ enum ePlexMediaState {
   PLEX_MEDIA_STATE_PAUSED
 };
 
+// This is used when we filter stuff in the media window
+// it's seperate because the numbers below actually map
+// to what the server expects. This should all be merged
+// with the enums above. The reason why it's separate here
+// is because of legacy reasons.
+enum ePlexMediaFilterTypes
+{
+  PLEX_MEDIA_FILTER_TYPE_NONE = 0,
+  PLEX_MEDIA_FILTER_TYPE_MOVIE = 1,
+  PLEX_MEDIA_FILTER_TYPE_SHOW,
+  PLEX_MEDIA_FILTER_TYPE_SEASON,
+  PLEX_MEDIA_FILTER_TYPE_EPISODE,
+  PLEX_MEDIA_FILTER_TYPE_TRAILER,
+  PLEX_MEDIA_FILTER_TYPE_COMIC,
+  PLEX_MEDIA_FILTER_TYPE_PERSON,
+  PLEX_MEDIA_FILTER_TYPE_ARTIST,
+  PLEX_MEDIA_FILTER_TYPE_ALBUM,
+  PLEX_MEDIA_FILTER_TYPE_TRACK,
+  PLEX_MEDIA_FILTER_TYPE_PHOTOALBUM,
+  PLEX_MEDIA_FILTER_TYPE_PICTURE,
+  PLEX_MEDIA_FILTER_TYPE_PHOTO,
+  PLEX_MEDIA_FILTER_TYPE_CLIP,
+  PLEX_MEDIA_FILTER_TYPE_PLAYLISTITEM
+};
+
 
 // Windows.
 #define WINDOW_NOW_PLAYING                10050
@@ -84,6 +109,7 @@ enum ePlexMediaState {
 #define WINDOW_PLEX_PREPLAY_MUSIC         10091
 #define WINDOW_PLEX_MYCHANNELS            10092
 #define WINDOW_PLEX_STARTUP_HELPER        10093
+#define WINDOW_PLEX_PLAY_QUEUE            10094
 #define WINDOW_MYPLEX_LOGIN                 10203
 
 // Dialogs.
@@ -93,6 +119,7 @@ enum ePlexMediaState {
 #define WINDOW_DIALOG_PLEX_SUBTITLE_PICKER  10204
 #define WINDOW_DIALOG_PLEX_AUDIO_PICKER     10205
 #define WINDOW_DIALOG_PLEX_SS_PHOTOS        10206
+#define WINDOW_DIALOG_PLEX_PLAYQUEUE        10207
 
 // Sent when the set of remote sources has changed
 #define GUI_MSG_UPDATE_REMOTE_SOURCES GUI_MSG_USER + 40
@@ -125,12 +152,14 @@ enum ePlexMediaState {
 #define GUI_MSG_MYPLEX_STATE_CHANGE GUI_MSG_USER + 75
 #define GUI_MSG_PLEX_SERVER_DATA_UNLOADED GUI_MSG_USER + 76
 #define GUI_MSG_PLEX_PAGE_LOADED GUI_MSG_USER + 77
+#define GUI_MSG_PLEX_PLAYQUEUE_UPDATED GUI_MSG_USER + 78
 
 #define PLEX_DATA_LOADER 99990
 #define PLEX_SERVER_MANAGER 99991
 #define PLEX_MYPLEX_MANAGER 99992
 #define PLEX_AUTO_UPDATER 99993
 #define PLEX_FILTER_MANAGER 99994
+#define PLEX_PLAYQUEUE_MANAGER 99995
 
 #define PLEX_STREAM_VIDEO    1
 #define PLEX_STREAM_AUDIO    2
@@ -150,6 +179,11 @@ class CMusicThumbLoader;
 #define SYSTEM_SELECTED_PLEX_MEDIA_SERVER      5002
 #define SYSTEM_UPDATE_IS_AVAILABLE  5003
 #define SYSTEM_NO_PLEX_SERVERS      5004
+#define SYSTEM_ISRASPLEX            5005
+#define SYSTEM_ISOPENELEC           5006
+#define CONTAINER_PLEXCONTENT       5007
+#define CONTAINER_PLEXFILTER        5008
+#define CONTAINER_UNIFORM_PROPERTY  5009
 #define SLIDESHOW_SHOW_DESCRIPTION  990
 
 #define LISTITEM_STAR_DIFFUSE       (LISTITEM_START + 110)
@@ -160,18 +194,16 @@ class CMusicThumbLoader;
 #define LISTITEM_GRANDPARENT_THUMB  (LISTITEM_START + 151)
 #define LISTITEM_STATUS             (LISTITEM_START + 152)
 
-#define LISTITEM_THUMB0             (LISTITEM_START + 170)
-#define LISTITEM_THUMB1             (LISTITEM_START + 171)
-#define LISTITEM_THUMB2             (LISTITEM_START + 172)
-#define LISTITEM_THUMB3             (LISTITEM_START + 173)
-#define LISTITEM_THUMB4             (LISTITEM_START + 174)
 #define LISTITEM_DURATION_STRING    (LISTITEM_START + 175)
+#define LISTITEM_COMPOSITE_IMAGE    (LISTITEM_START + 176)
 
 #define PLAYER_HAS_MUSIC_PLAYLIST   90
 
 // Message Ids for ApplicationMessenger
-#define TMSG_MEDIA_RESTART_WITH_NEW_PLAYER 208
-#define TMSG_HIDE                 911
+#define TMSG_MEDIA_RESTART_WITH_NEW_PLAYER 2000
+#define TMSG_HIDE                          2001
+#define TMSG_PLEX_PLAY_QUEUE_UPDATED       2002
+#define TMSG_PLEX_SAVE_SERVER_CACHE        2003
 
 #define CONF_FLAGS_RGB           0x20
 
@@ -214,5 +246,8 @@ typedef std::pair<std::string, CPlexServerPtr> PlexServerPair;
 
 /* Property map definition */
 typedef boost::unordered_map<CStdString, CVariant> PropertyMap;
+
+#define PLEX_HOME_THEATER_CAPABILITY_STRING "navigation,playback,timeline,mirror,playqueues"
+#define PLEX_HOME_THEATER_USER_AGENT "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_8_2) AppleWebKit/537.17 (KHTML, like Gecko) Chrome/24.0.1312.52 Safari/537.17"
 
 #endif

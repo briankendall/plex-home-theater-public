@@ -3,6 +3,8 @@
 #include "GUIWindowManager.h"
 #include "GUIMessage.h"
 #include "settings/GUISettings.h"
+#include "Playlists/PlexPlayQueueManager.h"
+#include "Application.h"
 
 #include "PlexTypes.h"
 
@@ -13,56 +15,63 @@
 
 using namespace XFILE;
 
-#define SECTION_REFRESH_INTERVAL 5 * 60 * 1000
+#define SECTION_REFRESH_INTERVAL 30 * 1000
+
+#define OWNED_SERVER_REFRESH 5 * 60 * 1000
 #define SHARED_SERVER_REFRESH 10 * 60 * 1000
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////
-CPlexServerDataLoader::CPlexServerDataLoader() : CJobQueue(false, 4, CJob::PRIORITY_NORMAL), m_stopped(false)
+CPlexServerDataLoader::CPlexServerDataLoader()
+  : CJobQueue(false, 4, CJob::PRIORITY_NORMAL), m_stopped(false)
 {
-  g_plexApplication.timer.SetTimeout(SECTION_REFRESH_INTERVAL, this);
+  g_plexApplication.timer->SetTimeout(SECTION_REFRESH_INTERVAL, this);
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////
-void CPlexServerDataLoader::LoadDataFromServer(const CPlexServerPtr &server)
+void CPlexServerDataLoader::LoadDataFromServer(const CPlexServerPtr& server)
 {
   if (m_stopped || !server)
     return;
 
   CSingleLock lk(m_serverLock);
-  
+
   if (m_servers.find(server->GetUUID()) == m_servers.end())
   {
     m_servers[server->GetUUID()] = server;
-    CLog::Log(LOGDEBUG, "CPlexServerDataLoader::LoadDataFromServer loading data for server %s", server->GetName().c_str());
+    CLog::Log(LOGDEBUG, "CPlexServerDataLoader::LoadDataFromServer loading data for server %s",
+              server->GetName().c_str());
     AddJob(new CPlexServerDataLoaderJob(server, shared_from_this()));
-    
-    g_plexApplication.timer.RestartTimeout(SECTION_REFRESH_INTERVAL, this);
   }
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////
-void CPlexServerDataLoader::RemoveServer(const CPlexServerPtr &server)
+void CPlexServerDataLoader::RemoveServer(const CPlexServerPtr& server)
 {
   if (m_stopped)
     return;
 
   CSingleLock lk(m_dataLock);
-  
+
+  CLog::Log(LOGDEBUG, "CPlexServerDataLoader::RemoveServer removing %s", server->GetName().c_str());
+
   if (m_sectionMap.find(server->GetUUID()) != m_sectionMap.end())
   {
-    CLog::Log(LOG_LEVEL_DEBUG, "CPlexServerDataLoader::RemoveServer from sectionMap %s", server->GetName().c_str());
+    CLog::Log(LOG_LEVEL_DEBUG, "CPlexServerDataLoader::RemoveServer from sectionMap %s",
+              server->GetName().c_str());
     m_sectionMap.erase(server->GetUUID());
   }
 
   if (m_sharedSectionsMap.find(server->GetUUID()) != m_sharedSectionsMap.end())
   {
-    CLog::Log(LOG_LEVEL_DEBUG, "CPlexServerDataLoader::RemoveServer from sharedSectionMap %s", server->GetName().c_str());
+    CLog::Log(LOG_LEVEL_DEBUG, "CPlexServerDataLoader::RemoveServer from sharedSectionMap %s",
+              server->GetName().c_str());
     m_sharedSectionsMap.erase(server->GetUUID());
   }
 
   if (m_channelMap.find(server->GetUUID()) != m_channelMap.end())
   {
-    CLog::Log(LOG_LEVEL_DEBUG, "CPlexServerDataLoader::RemoveServer from channelMap %s", server->GetName().c_str());
+    CLog::Log(LOG_LEVEL_DEBUG, "CPlexServerDataLoader::RemoveServer from channelMap %s",
+              server->GetName().c_str());
     m_channelMap.erase(server->GetUUID());
   }
 
@@ -75,13 +84,14 @@ void CPlexServerDataLoader::RemoveServer(const CPlexServerPtr &server)
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////
-void CPlexServerDataLoader::OnJobComplete(unsigned int jobID, bool success, CJob *job)
+void CPlexServerDataLoader::OnJobComplete(unsigned int jobID, bool success, CJob* job)
 {
-  CPlexServerDataLoaderJob *j = (CPlexServerDataLoaderJob*)job;
+  CPlexServerDataLoaderJob* j = (CPlexServerDataLoaderJob*)job;
   if (success && !m_stopped)
   {
     CSingleLock lk(m_dataLock);
-    if (j->m_sectionList) {
+    if (j->m_sectionList)
+    {
       CFileItemListPtr sectionList = j->m_sectionList;
       sectionList->SetProperty("serverUUID", j->m_server->GetUUID());
       sectionList->SetProperty("serverName", j->m_server->GetName());
@@ -91,7 +101,7 @@ void CPlexServerDataLoader::OnJobComplete(unsigned int jobID, bool success, CJob
       else
         m_sharedSectionsMap[j->m_server->GetUUID()] = sectionList;
     }
-    
+
     if (j->m_channelList)
     {
       m_channelMap[j->m_server->GetUUID()] = j->m_channelList;
@@ -106,13 +116,14 @@ void CPlexServerDataLoader::OnJobComplete(unsigned int jobID, bool success, CJob
     g_windowManager.SendThreadMessage(msg);
   }
   else
-    CLog::Log(LOGDEBUG, "CPlexServerDataLoader::OnJobComplete fail");
+    CLog::Log(LOGDEBUG, "CPlexServerDataLoader::OnJobComplete failed for server %s",
+              j->m_server->GetName().c_str());
 
   CJobQueue::OnJobComplete(jobID, success, job);
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////
-CFileItemListPtr CPlexServerDataLoader::GetSectionsForUUID(const CStdString &uuid)
+CFileItemListPtr CPlexServerDataLoader::GetSectionsForUUID(const CStdString& uuid)
 {
   CSingleLock lk(m_dataLock);
 
@@ -127,7 +138,7 @@ CFileItemListPtr CPlexServerDataLoader::GetSectionsForUUID(const CStdString &uui
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////
-CFileItemListPtr CPlexServerDataLoader::GetChannelsForUUID(const CStdString &uuid)
+CFileItemListPtr CPlexServerDataLoader::GetChannelsForUUID(const CStdString& uuid)
 {
   CSingleLock lk(m_dataLock);
   if (m_channelMap.find(uuid) != m_channelMap.end())
@@ -148,6 +159,50 @@ CFileItemListPtr CPlexServerDataLoaderJob::FetchList(const CStdString& path)
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////
+void CPlexServerDataLoaderJob::loadPreferences()
+{
+  for (int i = 0; i < m_sectionList->Size(); i++)
+  {
+    CFileItemPtr sectionItem = m_sectionList->Get(i);
+    if (sectionItem)
+    {
+      CURL u(sectionItem->GetPath());
+      PlexUtils::AppendPathToURL(u, "prefs");
+      CFileItemList prefsList;
+
+      if (m_dir.GetDirectory(u.Get(), prefsList))
+      {
+        if (prefsList.Size() > 0)
+        {
+          for (int y = 0; y < prefsList.Size(); y++)
+          {
+            CFileItemPtr prefsItem = prefsList.Get(y);
+            if (!prefsItem)
+              continue;
+
+            CStdString key("pref_");
+            key += prefsItem->GetProperty("id").asString();
+            CStdString value = prefsItem->GetProperty("value").asString();
+            CStdString type = prefsItem->GetProperty("type").asString();
+
+            CVariant realValue(value);
+
+            if (type == "bool")
+              realValue = CVariant((bool)(value == "true"));
+            /* FIXME: handle more values */
+
+            sectionItem->SetProperty(key, realValue);
+          }
+        }
+      }
+    }
+
+    if (m_abort)
+      return;
+  }
+}
+
+///////////////////////////////////////////////////////////////////////////////////////////////////
 bool CPlexServerDataLoaderJob::DoWork()
 {
   if (!m_server)
@@ -159,48 +214,14 @@ bool CPlexServerDataLoaderJob::DoWork()
     if (!m_sectionList)
       return false;
 
-    if (m_server->GetOwned())
+    if (m_server->GetOwned() && m_server->GetServerClass().empty())
     {
-      for (int i = 0; i < m_sectionList->Size(); i++)
-      {
-        CFileItemPtr sectionItem = m_sectionList->Get(i);
-        if (sectionItem)
-        {
-          CURL u(sectionItem->GetPath());
-          PlexUtils::AppendPathToURL(u, "prefs");
-          CFileItemList prefsList;
+      loadPreferences();
+      if (m_abort)
+        return false;
 
-          if (m_dir.GetDirectory(u.Get(), prefsList))
-          {
-            if (prefsList.Size() > 0)
-            {
-              for (int y = 0; y < prefsList.Size(); y ++)
-              {
-                CFileItemPtr prefsItem = prefsList.Get(y);
-                if (!prefsItem)
-                  continue;
-
-                CStdString key("pref_");
-                key += prefsItem->GetProperty("id").asString();
-                CStdString value = prefsItem->GetProperty("value").asString();
-                CStdString type = prefsItem->GetProperty("type").asString();
-
-                CVariant realValue(value);
-
-                if (type == "bool")
-                  realValue = CVariant((bool)(value == "true"));
-                /* FIXME: handle more values */
-
-                sectionItem->SetProperty(key, realValue);
-              }
-            }
-          }
-        }
-      }
-    }
-
-    if (m_server->GetOwned())
       m_channelList = FetchList("/channels/all");
+    }
   }
   else
   {
@@ -213,6 +234,11 @@ bool CPlexServerDataLoaderJob::DoWork()
     myPlexSection->SetPlexDirectoryType(PLEX_DIR_TYPE_PLAYLIST);
     m_sectionList->Add(myPlexSection);
   }
+
+  CURL playQueueURL(g_guiSettings.GetString("system.mostrecentplayqueue"));
+  if (playQueueURL.GetHostName() == m_server->GetUUID())
+    g_plexApplication.playQueueManager->loadSavedPlayQueue();
+
   return true;
 }
 
@@ -296,40 +322,51 @@ void CPlexServerDataLoader::OnTimeout()
 {
   CSingleLock lk(m_serverLock);
 
+  // don't run any checks during video playback
+  if (g_application.IsPlayingVideo())
+  {
+    g_plexApplication.timer->SetTimeout(SECTION_REFRESH_INTERVAL, this);
+    return;
+  }
+
   std::pair<CStdString, CPlexServerPtr> p;
   BOOST_FOREACH(p, m_servers)
   {
-    if (!p.second) continue;
+    if (!p.second)
+      continue;
 
     if (p.second->GetUUID() != "myplex")
     {
-      if (p.second->GetOwned() || p.second->GetLastRefreshed() > SHARED_SERVER_REFRESH)
+      if (p.second->GetLastRefreshed() == 0 ||
+          ((p.second->GetOwned() && p.second->GetLastRefreshed() > OWNED_SERVER_REFRESH) ||
+          (!p.second->GetOwned() && p.second->GetLastRefreshed() > SHARED_SERVER_REFRESH)))
       {
-        CLog::Log(LOGDEBUG, "CPlexServerDataLoader::OnTimeout refreshing data for %s", p.second->GetName().c_str());
+        CLog::Log(LOGDEBUG, "CPlexServerDataLoader::OnTimeout refreshing data for %s",
+                  p.second->GetName().c_str());
         AddJob(new CPlexServerDataLoaderJob(p.second, shared_from_this()));
       }
     }
   }
 
-  g_plexApplication.timer.SetTimeout(SECTION_REFRESH_INTERVAL, this);
+  g_plexApplication.timer->SetTimeout(SECTION_REFRESH_INTERVAL, this);
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 void CPlexServerDataLoader::Stop()
 {
-  g_plexApplication.timer.RemoveTimeout(this);
+  g_plexApplication.timer->RemoveTimeout(this);
   m_stopped = true;
 
   CancelJobs();
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////
-CFileItemPtr CPlexServerDataLoader::GetSection(const CURL &sectionUrl)
+CFileItemPtr CPlexServerDataLoader::GetSection(const CURL& sectionUrl)
 {
   CFileItemListPtr sections = GetSectionsForUUID(sectionUrl.GetHostName());
   if (sections && sections->Size() > 0)
   {
-    for (int i = 0; i < sections->Size(); i ++)
+    for (int i = 0; i < sections->Size(); i++)
     {
       CFileItemPtr item = sections->Get(i);
       if (item && item->GetPath() == sectionUrl.Get())
@@ -345,7 +382,7 @@ CFileItemPtr CPlexServerDataLoader::GetSection(const CURL &sectionUrl)
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////
-bool CPlexServerDataLoader::SectionHasFilters(const CURL &sectionUrl)
+bool CPlexServerDataLoader::SectionHasFilters(const CURL& sectionUrl)
 {
   CFileItemPtr item = GetSection(sectionUrl);
   if (item)
@@ -355,7 +392,7 @@ bool CPlexServerDataLoader::SectionHasFilters(const CURL &sectionUrl)
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////
-EPlexDirectoryType CPlexServerDataLoader::GetSectionType(const CURL &sectionUrl)
+EPlexDirectoryType CPlexServerDataLoader::GetSectionType(const CURL& sectionUrl)
 {
   CFileItemPtr item = GetSection(sectionUrl);
   if (item)

@@ -50,7 +50,9 @@ public:
   bool SendMessage(CGUIMessage& message);
   bool SendMessage(int message, int senderID, int destID, int param1 = 0, int param2 = 0);
   bool SendMessage(CGUIMessage& message, int window);
+ /* PLEX */
   int  RemoveThreadMessageByMessageIds(int *pMessageIDList);
+  /* END PLEX */
   void Initialize();
   void Add(CGUIWindow* pWindow);
   void AddUniqueInstance(CGUIWindow *window);

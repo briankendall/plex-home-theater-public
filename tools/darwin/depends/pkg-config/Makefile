@@ -2,13 +2,14 @@ include ../Makefile.include
 
 # lib name, version
 APPNAME=pkg-config
-VERSION=0.23
+VERSION=0.28
 SOURCE=$(APPNAME)-$(VERSION)
 ARCHIVE=$(SOURCE).tar.gz
+BASE_URL=http://mirrors.xbmc.org/build-deps/sources/
 
 # configuration settings
 export PATH:=$(TOOLCHAIN)/bin:$(PATH)
-CONFIGURE=./configure --prefix=$(TOOLCHAIN) --enable-indirect-deps --with-pc-path=$(PREFIX)/lib/pkgconfig:$(PREFIX)/share/pkgconfig
+CONFIGURE=./configure --prefix=$(TOOLCHAIN) --enable-indirect-deps --with-pc-path=$(PREFIX)/lib/pkgconfig:$(PREFIX)/share/pkgconfig --with-internal-glib
 
 APP=$(SOURCE)/bin/pkg-config
 APPBIN=$(TOOLCHAIN)/bin/$(APPNAME)

@@ -17,11 +17,12 @@
 
 #include "PlexApplication.h"
 #include "PlexServerCacheDatabase.h"
+#include "ApplicationMessenger.h"
 
 using namespace std;
 
-void
-CPlexServerReachabilityThread::Process()
+///////////////////////////////////////////////////////////////////////////////////////////////////
+void CPlexServerReachabilityThread::Process()
 {
   if (!g_plexApplication.serverManager)
     return;
@@ -34,6 +35,7 @@ CPlexServerReachabilityThread::Process()
   }
 }
 
+///////////////////////////////////////////////////////////////////////////////////////////////////
 CPlexServerManager::CPlexServerManager() : m_stopped(false)
 {
   CPlexConnectionPtr conn;
@@ -56,20 +58,32 @@ CPlexServerManager::CPlexServerManager() : m_stopped(false)
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////
-CPlexServerPtr CPlexServerManager::FindFromItem(CFileItemPtr item)
+CPlexServerManager::CPlexServerManager(const CPlexServerPtr &server) : m_stopped(false)
 {
-  if (!item)
-    return CPlexServerPtr();
+  m_serverMap[server->GetUUID()] = server;
+}
 
-  CStdString uuid = item->GetProperty("plexserver").asString();
+///////////////////////////////////////////////////////////////////////////////////////////////////
+CPlexServerPtr CPlexServerManager::FindFromItem(const CFileItem& item)
+{
+  CStdString uuid = item.GetProperty("plexserver").asString();
   if (uuid.empty())
     return CPlexServerPtr();
 
   return FindByUUID(uuid);
 }
 
-CPlexServerPtr
-CPlexServerManager::FindByUUID(const CStdString &uuid)
+///////////////////////////////////////////////////////////////////////////////////////////////////
+CPlexServerPtr CPlexServerManager::FindFromItem(CFileItemPtr item)
+{
+  if (!item)
+    return CPlexServerPtr();
+
+  return FindFromItem(*item);
+}
+
+///////////////////////////////////////////////////////////////////////////////////////////////////
+CPlexServerPtr CPlexServerManager::FindByUUID(const CStdString &uuid)
 {
   if (m_stopped)
     return CPlexServerPtr();
@@ -95,8 +109,8 @@ CPlexServerManager::FindByUUID(const CStdString &uuid)
   return CPlexServerPtr();
 }
 
-PlexServerList
-CPlexServerManager::GetAllServers(CPlexServerOwnedModifier modifier) const
+///////////////////////////////////////////////////////////////////////////////////////////////////
+PlexServerList CPlexServerManager::GetAllServers(CPlexServerOwnedModifier modifier) const
 {
   CSingleLock lk(m_serverManagerLock);
 
@@ -115,6 +129,7 @@ CPlexServerManager::GetAllServers(CPlexServerOwnedModifier modifier) const
   return ret;
 }
 
+///////////////////////////////////////////////////////////////////////////////////////////////////
 bool CPlexServerManager::HasAnyServerWithActiveConnection() const
 {
   CSingleLock lk(m_serverManagerLock);
@@ -127,15 +142,15 @@ bool CPlexServerManager::HasAnyServerWithActiveConnection() const
   return false;
 }
 
-void
-CPlexServerManager::MarkServersAsRefreshing()
+///////////////////////////////////////////////////////////////////////////////////////////////////
+void CPlexServerManager::MarkServersAsRefreshing()
 {
   BOOST_FOREACH(PlexServerPair p, m_serverMap)
     p.second->MarkAsRefreshing();
 }
 
-void
-CPlexServerManager::UpdateFromConnectionType(PlexServerList servers, int connectionType)
+///////////////////////////////////////////////////////////////////////////////////////////////////
+void CPlexServerManager::UpdateFromConnectionType(PlexServerList servers, int connectionType)
 {
   if (m_stopped) return;
   
@@ -147,23 +162,25 @@ CPlexServerManager::UpdateFromConnectionType(PlexServerList servers, int connect
 
   ServerRefreshComplete(connectionType);
   UpdateReachability();
+  lk.unlock();
+
   save();
 }
 
-void
-CPlexServerManager::UpdateFromDiscovery(CPlexServerPtr server)
+///////////////////////////////////////////////////////////////////////////////////////////////////
+void CPlexServerManager::UpdateFromDiscovery(CPlexServerPtr server)
 {
   if (m_stopped) return;
   
   CSingleLock lk(m_serverManagerLock);
 
   CPlexServerPtr mergedServer = MergeServer(server);
-  NotifyAboutServer(mergedServer);
+  NotifyAboutServer(mergedServer, mergedServer->GetActiveConnection());
   SetBestServer(mergedServer, false);
 }
 
-CPlexServerPtr
-CPlexServerManager::MergeServer(CPlexServerPtr server)
+///////////////////////////////////////////////////////////////////////////////////////////////////
+CPlexServerPtr CPlexServerManager::MergeServer(CPlexServerPtr server)
 {
   CSingleLock lk(m_serverManagerLock);
 
@@ -184,8 +201,8 @@ CPlexServerManager::MergeServer(CPlexServerPtr server)
   }
 }
 
-void
-CPlexServerManager::ServerRefreshComplete(int connectionType)
+///////////////////////////////////////////////////////////////////////////////////////////////////
+void CPlexServerManager::ServerRefreshComplete(int connectionType)
 {
   vector<CStdString> serversToRemove;
 
@@ -203,17 +220,15 @@ CPlexServerManager::ServerRefreshComplete(int connectionType)
   }
 }
 
-void
-CPlexServerManager::UpdateReachability(bool force)
+///////////////////////////////////////////////////////////////////////////////////////////////////
+void CPlexServerManager::UpdateReachability(bool force)
 {
   CSingleLock lk(m_serverManagerLock);
 
-  CLog::Log(LOGDEBUG, "CPlexServerManager::UpdateReachability Updating reachability (force=%s)", force ? "YES" : "NO");
   if (m_reachabilityThreads.size() > 0)
-  {
-    CLog::Log(LOGWARNING, "CPlexServerManager::UpdateReachability WOW, BAD we are already running reachability tests. We can't do it twice, mmmkey?");
     return;
-  }
+
+  CLog::Log(LOGDEBUG, "CPlexServerManager::UpdateReachability Updating reachability (force=%s)", force ? "YES" : "NO");
 
   m_updateRechabilityForced = force;
   m_reachabilityTestEvent.Reset();
@@ -225,14 +240,14 @@ CPlexServerManager::UpdateReachability(bool force)
   }
 }
 
-void
-CPlexServerManager::SetBestServer(CPlexServerPtr server, bool force)
+///////////////////////////////////////////////////////////////////////////////////////////////////
+void CPlexServerManager::SetBestServer(CPlexServerPtr server, bool force)
 {
   if (!server)
     return;
   
   CSingleLock lk(m_serverManagerLock);
-  if (!m_bestServer || force || m_bestServer == server)
+  if (!m_bestServer || force || m_bestServer->Equals(server))
   {
     CLog::Log(LOGDEBUG, "CPlexServerManager::SetBestServer bestServer updated to %s", server->toString().c_str());
 
@@ -247,13 +262,14 @@ CPlexServerManager::SetBestServer(CPlexServerPtr server, bool force)
   }
 }
 
-void
-CPlexServerManager::ClearBestServer()
+///////////////////////////////////////////////////////////////////////////////////////////////////
+void CPlexServerManager::ClearBestServer()
 {
   CLog::Log(LOGDEBUG, "CPlexServerManager::ClearBestServer clearing %s", m_bestServer->toString().c_str());
   m_bestServer.reset();
 }
 
+///////////////////////////////////////////////////////////////////////////////////////////////////
 void CPlexServerManager::ServerReachabilityDone(CPlexServerPtr server, bool success)
 {
   int reachThreads = 0;
@@ -275,7 +291,7 @@ void CPlexServerManager::ServerReachabilityDone(CPlexServerPtr server, bool succ
   }
   else
   {
-    if (m_bestServer == server)
+    if (m_bestServer && m_bestServer->Equals(server))
       ClearBestServer();
     
     NotifyAboutServer(server, false);
@@ -287,7 +303,10 @@ void CPlexServerManager::ServerReachabilityDone(CPlexServerPtr server, bool succ
     m_reachabilityTestEvent.Set();
 
     if (!m_bestServer && !m_updateRechabilityForced)
+    {
+      CLog::Log(LOGDEBUG, "CPlexServerManager::ServerReachabilityDone No best server when reachability was done. forcing update");
       UpdateReachability(true);
+    }
   }
   else
   {
@@ -295,8 +314,8 @@ void CPlexServerManager::ServerReachabilityDone(CPlexServerPtr server, bool succ
   }
 }
 
-void
-CPlexServerManager::NotifyAboutServer(CPlexServerPtr server, bool added)
+///////////////////////////////////////////////////////////////////////////////////////////////////
+void CPlexServerManager::NotifyAboutServer(CPlexServerPtr server, bool added)
 {
   CGUIMessage msg(GUI_MSG_PLEX_SERVER_NOTIFICATION, 0, 0, added ? 1 : 0);
   msg.SetStringParam(server->GetUUID());
@@ -308,17 +327,13 @@ CPlexServerManager::NotifyAboutServer(CPlexServerPtr server, bool added)
     g_plexApplication.dataLoader->RemoveServer(server);
 }
 
+///////////////////////////////////////////////////////////////////////////////////////////////////
 void CPlexServerManager::save()
 {
-  CSingleLock lk(m_serverManagerLock);
-  CPlexServerCacheDatabase db;
-  if (db.Open())
-  {
-    db.cacheServers();
-    db.Close();
-  }
+  CApplicationMessenger::Get().PlexSaveServerCache();
 }
 
+///////////////////////////////////////////////////////////////////////////////////////////////////
 void CPlexServerManager::load()
 {
   CSingleLock lk(m_serverManagerLock);

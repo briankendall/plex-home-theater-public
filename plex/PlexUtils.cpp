@@ -5,6 +5,7 @@
 #include <boost/algorithm/string/split.hpp>
 #include <boost/foreach.hpp>
 #include <boost/lexical_cast.hpp>
+#include <boost/random.hpp>
 
 #include "Utility/sha1.hpp"
 
@@ -24,6 +25,7 @@
 #include "GUIWindowManager.h"
 #include "Key.h"
 #include "GUI/GUIPlexMediaWindow.h"
+#include "Application.h"
 
 #include "File.h"
 
@@ -273,6 +275,9 @@ string PlexUtils::GetMachinePlatformVersion()
 ///////////////////////////////////////////////////////////////////////////////
 std::string PlexUtils::GetStreamChannelName(CFileItemPtr item)
 {
+  if (!item->HasProperty("channels"))
+    return "";
+
   int64_t channels = item->GetProperty("channels").asInteger();
 
   if (channels == 1)
@@ -286,6 +291,9 @@ std::string PlexUtils::GetStreamChannelName(CFileItemPtr item)
 ///////////////////////////////////////////////////////////////////////////////
 std::string PlexUtils::GetStreamCodecName(CFileItemPtr item)
 {
+  if (!item->HasProperty("codec"))
+    return "";
+
   std::string codec = item->GetProperty("codec").asString();
   if (codec == "dca")
     return "DTS";
@@ -442,29 +450,81 @@ std::string PlexUtils::GetPlexCrashPath()
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////
+CStdString PlexUtils::GetPrettyMediaItemName(const CFileItemPtr& mediaItem)
+{
+  CStdString label;
+  CStdString videoCodec = CStdString(mediaItem->GetProperty("mediaTag-videoCodec").asString()).ToUpper();
+  CStdString videoRes = CStdString(mediaItem->GetProperty("mediaTag-videoResolution").asString()).ToUpper();
+  CStdString audioLabel = g_localizeStrings.Get(13205);
+  CFileItemPtr part = mediaItem->m_mediaParts[0];
+  if (part)
+  {
+    CFileItemPtr audioStream = GetSelectedStreamOfType(part, PLEX_STREAM_AUDIO);
+    if (audioStream)
+      audioLabel = GetPrettyStreamNameFromStreamItem(audioStream);
+  }
+
+  if (videoCodec.size() == 0 && videoRes.size() == 0)
+  {
+    label = g_localizeStrings.Get(13205);
+  }
+  else
+  {
+    if (isdigit(videoRes[0]))
+      videoRes += "p";
+
+    label += videoRes;
+    label += " " + videoCodec;
+  }
+
+  label += " - " + audioLabel;
+
+  return label;
+}
+
+///////////////////////////////////////////////////////////////////////////////////////////////////
 CStdString PlexUtils::GetPrettyStreamNameFromStreamItem(CFileItemPtr stream)
 {
   CStdString name;
 
   if (stream->HasProperty("language") && !stream->GetProperty("language").asString().empty())
-  {
     name = stream->GetProperty("language").asString();
-    if (stream->GetProperty("streamType").asInteger() == PLEX_STREAM_AUDIO)
+  else
+    name = g_localizeStrings.Get(1446).empty() ? "Unknown" : g_localizeStrings.Get(1446);
+
+  if (stream->GetProperty("streamType").asInteger() == PLEX_STREAM_AUDIO)
+  {
+    if (stream->HasProperty("codec") || stream->HasProperty("channels"))
     {
-      name += " (" + GetStreamCodecName(stream) + " " + GetStreamChannelName(stream) + ")";
+      name += " (";
+      if (stream->HasProperty("codec"))
+        name += GetStreamCodecName(stream);
+
+      if (stream->HasProperty("channels") && stream->HasProperty("codec"))
+        name += " ";
+
+      if (stream->HasProperty("channels"))
+        name += GetStreamChannelName(stream);
+
+      name += ")";
     }
-    else if (stream->HasProperty("format"))
+  }
+  else if (stream->GetProperty("streamType") == PLEX_STREAM_SUBTITLE)
+  {
+    if (!stream->GetProperty("format").empty() || stream->HasProperty("codec"))
     {
-      name += " (" + boost::to_upper_copy(stream->GetProperty("format").asString());
+      name += " (";
+      if (!stream->GetProperty("format").empty())
+        name += boost::to_upper_copy(stream->GetProperty("format").asString());
+      else if (stream->HasProperty("codec"))
+        name += boost::to_upper_copy(stream->GetProperty("codec").asString());
+
       if (stream->GetProperty("forced").asBoolean())
         name += " " + g_localizeStrings.Get(52503) + ")";
       else
         name += ")";
-
     }
   }
-  else
-    name = g_localizeStrings.Get(1446);
 
   return name;
 }
@@ -625,18 +685,27 @@ void PlexUtils::LogStackTrace(char *FuncName) {}
 #endif
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////
-ePlexMediaType PlexUtils::GetMediaTypeFromItem(CFileItemPtr item)
+ePlexMediaType PlexUtils::GetMediaTypeFromItem(const CFileItem& item)
 {
-  EPlexDirectoryType plexType = item->GetPlexDirectoryType();
+  EPlexDirectoryType plexType = item.GetPlexDirectoryType();
+
+  // If we get a channel here we need to check the property channelType for
+  // the real type (video/music etc)
+  if (plexType == PLEX_DIR_TYPE_CHANNEL && item.HasProperty("channelType"))
+    plexType = (EPlexDirectoryType)item.GetProperty("channelType").asInteger();
 
   switch(plexType)
   {
     case PLEX_DIR_TYPE_TRACK:
+    case PLEX_DIR_TYPE_ALBUM:
+    case PLEX_DIR_TYPE_ARTIST:
       return PLEX_MEDIA_TYPE_MUSIC;
     case PLEX_DIR_TYPE_VIDEO:
     case PLEX_DIR_TYPE_EPISODE:
     case PLEX_DIR_TYPE_CLIP:
     case PLEX_DIR_TYPE_MOVIE:
+    case PLEX_DIR_TYPE_SEASON:
+    case PLEX_DIR_TYPE_SHOW:
       return PLEX_MEDIA_TYPE_VIDEO;
     case PLEX_DIR_TYPE_IMAGE:
     case PLEX_DIR_TYPE_PHOTO:
@@ -645,6 +714,12 @@ ePlexMediaType PlexUtils::GetMediaTypeFromItem(CFileItemPtr item)
     default:
       return PLEX_MEDIA_TYPE_UNKNOWN;
   }
+}
+
+///////////////////////////////////////////////////////////////////////////////////////////////////
+ePlexMediaType PlexUtils::GetMediaTypeFromItem(CFileItemPtr item)
+{
+  return GetMediaTypeFromItem(*(item.get()));
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////
@@ -698,8 +773,7 @@ std::string PlexUtils::GetMediaStateString(ePlexMediaState state)
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 ePlexMediaState PlexUtils::GetMediaStateFromString(const std::string& statestr)
-{
-  if (statestr == "stopped")
+{ if (statestr == "stopped")
     return PLEX_MEDIA_STATE_STOPPED;
   else if (statestr == "buffering")
     return PLEX_MEDIA_STATE_BUFFERING;
@@ -709,4 +783,203 @@ ePlexMediaState PlexUtils::GetMediaStateFromString(const std::string& statestr)
     return PLEX_MEDIA_STATE_PAUSED;
 
   return PLEX_MEDIA_STATE_STOPPED;
+}
+
+///////////////////////////////////////////////////////////////////////////////////////////////////
+unsigned long PlexUtils::GetFastHash(std::string Data)
+{
+  // DJB2 FastHash Method (http://www.cse.yorku.ca/~oz/hash.html)
+  unsigned long hash = 5381;
+  int c;
+  const char* str = Data.c_str();
+
+  while ((c = *str++))
+    hash = ((hash << 5) + hash) + c; /* hash * 33 + c */
+
+  return hash;
+}
+
+///////////////////////////////////////////////////////////////////////////////////////////////////
+bool PlexUtils::IsPlayingPlaylist()
+{
+  if (!g_application.IsPlaying())
+    return false;
+
+  int playlist = g_playlistPlayer.GetCurrentPlaylist();
+  if (g_playlistPlayer.GetPlaylist(playlist).size() > 0 && g_playlistPlayer.GetCurrentSong() != -1)
+    return true;
+
+  return false;
+}
+
+///////////////////////////////////////////////////////////////////////////////////////////////////
+string PlexUtils::GetCompositeImageUrl(const CFileItem &item, const CStdString &args)
+{
+  if (!item.HasProperty("composite"))
+    return "";
+
+  CURL newURL(item.GetProperty("composite").asString());
+  CStdStringArray argList = StringUtils::SplitString(args, ";", 0);
+  if (argList.size() > 0)
+  {
+    BOOST_FOREACH(const CStdString& arg, argList)
+    {
+      CStdStringArray kv = StringUtils::SplitString(arg, "=", 2);
+      if (kv.size() == 2)
+        newURL.SetOption(kv[0], kv[1]);
+    }
+  }
+  return newURL.Get();
+}
+
+////////////////////////////////////////////////////////////////////////////////
+string PlexUtils::GetPlexContent(const CFileItem &item)
+{
+  CStdString content;
+
+  if (item.HasProperty("sectionType") &&
+      item.GetProperty("sectionType").asInteger() == PLEX_DIR_TYPE_HOME_MOVIES)
+    return "homemovies";
+
+  // this is SUCH a hack.
+  if (item.HasProperty("title2") && item.GetProperty("title2").asString() == "By Folder")
+    return "folders";
+
+  // check if we are requesting a single item
+  CURL itemUrl(item.GetProperty("key").asString());
+  bool singleItem = item.GetProperty("size").asInteger() < 2 && !item.HasProperty("viewGroup");
+
+  if (boost::starts_with(itemUrl.GetFileName(), "playQueues") ||
+      itemUrl.Get() == "plexserver://playqueue/")
+  {
+    singleItem = false;
+    if (item.GetProperty("hasMixedMembers").asBoolean())
+      return "mixedcontent";
+  }
+
+  switch(item.GetPlexDirectoryType())
+  {
+    case PLEX_DIR_TYPE_MOVIE:
+      if (singleItem)
+        content = "movie";
+      else
+        content = "movies";
+      break;
+    case PLEX_DIR_TYPE_SHOW:
+      content = "tvshows";
+      break;
+    case PLEX_DIR_TYPE_SEASON:
+      content = "seasons";
+      break;
+    case PLEX_DIR_TYPE_EPISODE:
+      if (singleItem)
+        content = "episode";
+      else
+        content = "episodes";
+      break;
+    case PLEX_DIR_TYPE_ARTIST:
+      content = "artists";
+      break;
+    case PLEX_DIR_TYPE_ALBUM:
+      content = "albums";
+      break;
+    case PLEX_DIR_TYPE_TRACK:
+      content = "songs";
+      break;
+    case PLEX_DIR_TYPE_SECONDARY:
+      content = "secondary";
+      break;
+    case PLEX_DIR_TYPE_CHANNEL:
+      content = "channel";
+      break;
+    case PLEX_DIR_TYPE_CHANNELS:
+      content = "channels";
+      break;
+    case PLEX_DIR_TYPE_CLIP:
+      if (singleItem)
+        content = "clip";
+      else
+        content = "clips";
+      break;
+    case PLEX_DIR_TYPE_PHOTO:
+      content = "photos";
+      break;
+    case PLEX_DIR_TYPE_PHOTOALBUM:
+      content = "photoalbums";
+      break;
+    default:
+      break;
+  }
+  return content;
+}
+
+///////////////////////////////////////////////////////////////////////////////////////////////////
+ePlexMediaFilterTypes PlexUtils::GetFilterType(const CFileItem& item)
+{
+  switch (item.GetPlexDirectoryType())
+  {
+    case PLEX_DIR_TYPE_MOVIE:
+      return PLEX_MEDIA_FILTER_TYPE_MOVIE;
+    case PLEX_DIR_TYPE_SHOW:
+      return PLEX_MEDIA_FILTER_TYPE_SHOW;
+    case PLEX_DIR_TYPE_SEASON:
+      return PLEX_MEDIA_FILTER_TYPE_SEASON;
+    case PLEX_DIR_TYPE_EPISODE:
+      return PLEX_MEDIA_FILTER_TYPE_EPISODE;
+#if 0
+    case PLEX_DIR_TYPE_TRAILER:
+      return PLEX_MEDIA_FILTER_TYPE_TRAILER;
+    case PLEX_DIR_TYPE_COMIC:
+      return PLEX_MEDIA_FILTER_TYPE_COMIC;
+    case PLEX_DIR_TYPE_PERSON:
+      return PLEX_MEDIA_FILTER_TYPE_PERSON;
+#endif
+    case PLEX_DIR_TYPE_ARTIST:
+      return PLEX_MEDIA_FILTER_TYPE_ARTIST;
+    case PLEX_DIR_TYPE_ALBUM:
+      return PLEX_MEDIA_FILTER_TYPE_ALBUM;
+    case PLEX_DIR_TYPE_TRACK:
+      return PLEX_MEDIA_FILTER_TYPE_TRACK;
+    case PLEX_DIR_TYPE_PHOTOALBUM:
+      return PLEX_MEDIA_FILTER_TYPE_PHOTOALBUM;
+#if 0
+    case PLEX_DIR_TYPE_PICTURE:
+      return PLEX_MEDIA_FILTER_TYPE_PICTURE;
+#endif
+    case PLEX_DIR_TYPE_PHOTO:
+      return PLEX_MEDIA_FILTER_TYPE_PHOTO;
+    case PLEX_DIR_TYPE_CLIP:
+      return PLEX_MEDIA_FILTER_TYPE_CLIP;
+    case PLEX_DIR_TYPE_PLAYLIST:
+      return PLEX_MEDIA_FILTER_TYPE_PLAYLISTITEM;
+    default:
+      return PLEX_MEDIA_FILTER_TYPE_NONE;
+  }
+}
+
+///////////////////////////////////////////////////////////////////////////////////////////////////
+void PlexUtils::SetItemResumeOffset(const CFileItemPtr& item, int64_t offint)
+{
+  if (offint == -1)
+    offint = item->GetProperty("viewOffset").asInteger(0);
+
+  item->SetProperty("viewOffset", offint);
+  if (item->GetPlexDirectoryType() == PLEX_DIR_TYPE_TRACK)
+    item->m_lStartOffset = (offint / 1000) * 75;
+  else
+    item->m_lStartOffset = offint != 0 ? STARTOFFSET_RESUME : 0;
+
+  item->SetProperty("forceStartOffset", true);
+}
+
+///////////////////////////////////////////////////////////////////////////////////////////////////
+CFileItemPtr PlexUtils::GetItemWithKey(const CFileItemList& list, const std::string& key)
+{
+  for (int i = 0; i < list.Size(); i ++)
+  {
+    if (list[i]->GetProperty("key").asString() == key)
+      return list[i];
+  }
+
+  return CFileItemPtr();
 }

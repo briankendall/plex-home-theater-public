@@ -65,6 +65,9 @@ public:
   /* PLEX */
   CStdString GetCurrentPlexLabel()
   {
+    if (m_files.size() < 1)
+      return "";
+
     std::string path = m_files[m_currentImage];
     if (m_plexLabels.find(path) != m_plexLabels.end())
       return m_plexLabels[m_files[m_currentImage]];

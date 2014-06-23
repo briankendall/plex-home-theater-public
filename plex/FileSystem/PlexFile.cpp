@@ -6,9 +6,12 @@
 #include <boost/assign.hpp>
 #include <boost/foreach.hpp>
 #include <string>
+#include "Mime.h"
+#include "URIUtils.h"
 
 #include "PlexApplication.h"
 #include "GUIInfoManager.h"
+#include "LangInfo.h"
 
 using namespace XFILE;
 using namespace std;
@@ -32,6 +35,8 @@ vector<stringPair> CPlexFile::GetHeaderList()
   hdrs.push_back(stringPair("X-Plex-Device", "RaspberryPi"));
 #elif defined(TARGET_DARWIN_IOS)
   hdrs.push_back(stringPair("X-Plex-Device", "AppleTV"));
+#elif defined(OPENELEC)
+  hdrs.push_back(stringPair("X-Plex-Device", "OpenELEC"));
 #else
   hdrs.push_back(stringPair("X-Plex-Device", "PC"));
 #endif
@@ -51,8 +56,10 @@ vector<stringPair> CPlexFile::GetHeaderList()
   
   hdrs.push_back(stringPair("X-Plex-Client-Capabilities", protocols));
   
-  if (g_plexApplication.myPlexManager->IsSignedIn())
+  if (g_plexApplication.myPlexManager && g_plexApplication.myPlexManager->IsSignedIn())
     hdrs.push_back(stringPair("X-Plex-Username", g_plexApplication.myPlexManager->GetCurrentUserInfo().username));
+
+  hdrs.push_back(stringPair("X-Plex-Language", g_langInfo.GetLanguageLocale()));
 
   return hdrs;
 }
@@ -61,6 +68,8 @@ CPlexFile::CPlexFile(void) : CCurlFile()
 {
   BOOST_FOREACH(stringPair sp, GetHeaderList())
     SetRequestHeader(sp.first, sp.second);
+
+  SetUserAgent(PLEX_HOME_THEATER_USER_AGENT);
 }
 
 bool
@@ -126,9 +135,20 @@ int
 CPlexFile::Stat(const CURL &url, struct __stat64 *buffer)
 {
   CURL newUrl(url);
+
+  // ImageLib makes stupid Stat() calls just to figure out
+  // if this is a directory or not. Let's just shortcut that
+  // and tell it everything it requests from photo/:/transcode
+  // is a file
+  if (newUrl.GetFileName() == "photo/:/transcode")
+  {
+    buffer->st_mode = _S_IFREG;
+    return 0;
+  }
+
   if (BuildHTTPURL(newUrl))
     return CCurlFile::Stat(newUrl, buffer);
-  return false;
+  return -1;
 }
 
 bool
@@ -138,4 +158,33 @@ CPlexFile::Exists(const CURL &url)
   if (BuildHTTPURL(newUrl))
     return CCurlFile::Exists(newUrl);
   return false;
+}
+
+///////////////////////////////////////////////////////////////////////////////////////////////////
+CStdString CPlexFile::GetMimeType(const CURL& url)
+{
+  /* we only handle plexserver:// stuff here */
+  if (url.GetProtocol() != "plexserver")
+    return "";
+
+  CStdString path = url.GetFileName();
+
+  if (boost::starts_with(path, "/video"))
+    return "video/unknown";
+  if (boost::starts_with(path, "/music"))
+    return "audio/uknown";
+  if (boost::starts_with(path, "/photo"))
+    return "image/unknown";
+
+  CStdString extension = URIUtils::GetExtension(path);
+  return CMime::GetMimeType(extension);
+}
+
+///////////////////////////////////////////////////////////////////////////////////////////////////
+int CPlexFile::IoControl(EIoControl request, void* param)
+{
+  if ( (request == IOCTRL_SEEK_POSSIBLE) && (boost::starts_with(m_url, ":/transcode")) )
+    return 1;
+  else
+    return CCurlFile::IoControl(request, param);
 }

@@ -66,6 +66,14 @@
 
 #include "utils/GlobalsHandling.h"
 
+/* PLEX */
+#include "PlexApplication.h"
+#include "Playlists/PlexPlayQueueManager.h"
+#include "Client/PlexServerCacheDatabase.h"
+#include "PlexBusyIndicator.h"
+#include "PlexJobs.h"
+/* END PLEX */
+
 using namespace PVR;
 using namespace std;
 using namespace MUSIC_INFO;
@@ -436,9 +444,19 @@ void CApplicationMessenger::ProcessMessage(ThreadMessage *pMsg)
         CFileItemList items;
         CStdString strPath = pMsg->strParam;
         CStdString extensions = g_settings.m_pictureExtensions;
+#ifndef __PLEX__
         if (pMsg->dwParam1)
           extensions += "|.tbn";
         CUtil::GetRecursiveListing(strPath, items, extensions);
+#else
+        if (!g_plexApplication.busy.blockWaitingForJob(new CPlexRecursiveFetchJob(strPath, extensions, &items), NULL))
+          break;
+#endif
+
+        /* PLEX */
+        if (pMsg->dwParam2)
+          items.Randomize();
+        /* END PLEX */
 
         if (items.Size() > 0)
         {
@@ -646,7 +664,8 @@ void CApplicationMessenger::ProcessMessage(ThreadMessage *pMsg)
       {
         CGUIDialog* pDialog = (CGUIDialog*)g_windowManager.GetWindow(pMsg->dwParam1);
         if (!pDialog) return ;
-        pDialog->DoModal();
+        // PLEX - added the arguments here
+        pDialog->DoModal(WINDOW_INVALID, pMsg->strParam);
       }
       break;
 
@@ -825,6 +844,24 @@ void CApplicationMessenger::ProcessMessage(ThreadMessage *pMsg)
         g_application.Hide();
       }
       break;
+    case TMSG_PLEX_PLAY_QUEUE_UPDATED:
+    {
+      g_plexApplication.playQueueManager->playQueueUpdated((ePlexMediaType)pMsg->dwParam1,
+                                                           (bool)pMsg->dwParam2);
+      break;
+    }
+    case TMSG_PLEX_SAVE_SERVER_CACHE:
+    {
+      if (!g_application.IsPlayingFullScreenVideo())
+      {
+        CPlexServerCacheDatabase db;
+        if (db.Open())
+        {
+          db.cacheServers();
+          db.Close();
+        }
+      }
+    }
     /* END PLEX */
 
   }
@@ -1074,18 +1111,6 @@ void CApplicationMessenger::PictureSlideShow(string pathname, bool addTBN /* = f
   SendMessage(tMsg);
 }
 
-/* PLEX */
-void CApplicationMessenger::PictureSlideShow(string pathname, bool addTBN, const string& index)
-{
-  DWORD dwMessage = TMSG_PICTURE_SLIDESHOW;
-  ThreadMessage tMsg = {dwMessage};
-  tMsg.strParam = pathname;
-  tMsg.dwParam1 = addTBN ? 1 : 0;
-  tMsg.params.push_back(index);
-  SendMessage(tMsg);
-}
-/* END PLEX */
-
 void CApplicationMessenger::SetGUILanguage(const std::string &strLanguage)
 {
   ThreadMessage tMsg = {TMSG_SETLANGUAGE};
@@ -1174,6 +1199,7 @@ void CApplicationMessenger::DoModal(CGUIDialog *pDialog, int iWindowID, const CS
   tMsg.lpVoid = pDialog;
   tMsg.dwParam1 = (DWORD)iWindowID;
   tMsg.strParam = param;
+
   SendMessage(tMsg, wait /* PLEX */);
 }
 
@@ -1338,6 +1364,31 @@ void CApplicationMessenger::Hide()
 {
   ThreadMessage tMsg = {TMSG_HIDE};
   SendMessage(tMsg, true);
+}
+
+void CApplicationMessenger::PlexUpdatePlayQueue(ePlexMediaType type, bool startPlaying)
+{
+  ThreadMessage tMsg = {TMSG_PLEX_PLAY_QUEUE_UPDATED};
+  tMsg.dwParam1 = (int)type;
+  tMsg.dwParam2 = (int)startPlaying;
+  SendMessage(tMsg, false);
+}
+
+void CApplicationMessenger::PictureSlideShow(string pathname, bool addTBN, const string& index, bool shuffle)
+{
+  DWORD dwMessage = TMSG_PICTURE_SLIDESHOW;
+  ThreadMessage tMsg = {dwMessage};
+  tMsg.strParam = pathname;
+  tMsg.dwParam1 = addTBN ? 1 : 0;
+  tMsg.dwParam2 = shuffle ? 1 : 0;
+  tMsg.params.push_back(index);
+  SendMessage(tMsg);
+}
+
+void CApplicationMessenger::PlexSaveServerCache()
+{
+  ThreadMessage tMsg = {TMSG_PLEX_SAVE_SERVER_CACHE};
+  SendMessage(tMsg, false);
 }
 
 /* END PLEX */

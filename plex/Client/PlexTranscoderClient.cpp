@@ -22,7 +22,10 @@
 #include "Client/PlexServerManager.h"
 #include "Client/PlexServer.h"
 #include "PlexMediaDecisionEngine.h"
-
+#include "Client/PlexServerVersion.h"
+#include "dialogs/GUIDialogKaiToast.h"
+#include "AdvancedSettings.h"
+#include "Client/PlexTranscoderClientRPi.h"
 #include "log.h"
 
 #include <map>
@@ -37,6 +40,7 @@ static str2str _qualities = boost::assign::list_of<std::pair<std::string, std::s
   ("64", "10") ("96", "20") ("208", "30") ("320", "30") ("720", "40") ("1500", "60") ("2000", "60")
   ("3000", "75") ("4000", "100") ("8000", "60") ("10000", "75") ("12000", "90") ("20000", "100");
 
+CPlexTranscoderClient *CPlexTranscoderClient::_Instance = NULL;
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 PlexIntStringMap CPlexTranscoderClient::getOnlineQualties()
@@ -49,6 +53,24 @@ PlexIntStringMap CPlexTranscoderClient::getOnlineQualties()
   qual[PLEX_ONLINE_QUALITY_SD] = g_localizeStrings.Get(13185);
 
   return qual;
+}
+
+///////////////////////////////////////////////////////////////////////////////////////////////////
+int CPlexTranscoderClient::getIntegerRepresentation(int qualitySetting)
+{
+  switch (qualitySetting)
+  {
+    case PLEX_ONLINE_QUALITY_1080p:
+      return 1080;
+    case PLEX_ONLINE_QUALITY_720p:
+      return 720;
+    case PLEX_ONLINE_QUALITY_480p:
+      return 480;
+    case PLEX_ONLINE_QUALITY_SD:
+      return 320;
+    default:
+      return -1;
+  }
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////
@@ -67,6 +89,57 @@ int CPlexTranscoderClient::getBandwidthForQuality(int quality)
     default:
       return 400 * 8;
   }
+}
+
+///////////////////////////////////////////////////////////////////////////////////////////////////
+int CPlexTranscoderClient::autoSelectQuality(const CFileItem& file, int target)
+{
+  int selectedMediaItem = 0;
+  int onlineQuality = CPlexTranscoderClient::getIntegerRepresentation(target);
+
+  // Try to pick something that's equal or less than the preferred resolution.
+  std::map<int, int> qualityMap;
+  std::vector<int> qualities;
+  int sd = getIntegerRepresentation(PLEX_ONLINE_QUALITY_SD);
+
+  for (size_t i = 0; i < file.m_mediaItems.size(); i++)
+  {
+    CFileItemPtr item = file.m_mediaItems[i];
+    CStdString videoRes =
+        CStdString(item->GetProperty("mediaTag-videoResolution").asString()).ToUpper();
+
+    // Compute the quality, subsequent SDs get lesser values, assuming they're ordered
+    // descending.
+    int q = sd;
+    if (videoRes != "SD" && videoRes.empty() == false)
+    {
+      try { q = boost::lexical_cast<int>(videoRes); }
+      catch (...) { }
+    }
+    else
+    {
+      sd -= 10;
+    }
+
+    qualityMap[q] = i;
+    qualities.push_back(q);
+  }
+
+  // Sort on quality descending.
+  std::sort(qualities.begin(), qualities.end());
+  std::reverse(qualities.begin(), qualities.end());
+
+  int pickedIndex = qualities[qualities.size() - 1];
+  BOOST_FOREACH(int q, qualities)
+  {
+    if (q <= onlineQuality)
+    {
+      pickedIndex = qualityMap[q];
+      selectedMediaItem = file.m_mediaItems[pickedIndex]->GetProperty("id").asInteger();
+      break;
+    }
+  }
+  return selectedMediaItem;
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////
@@ -179,7 +252,7 @@ bool CPlexTranscoderClient::ShouldTranscode(CPlexServerPtr server, const CFileIt
 
   if (!server || !server->GetActiveConnection())
     return false;
-  
+
   if (server->GetActiveConnection()->IsLocal())
     return g_guiSettings.GetInt("plexmediaserver.localquality") != 0;
   else
@@ -191,17 +264,65 @@ typedef std::pair<std::string, std::string> stringPair;
 CURL CPlexTranscoderClient::GetTranscodeURL(CPlexServerPtr server, const CFileItem& item)
 {
   bool isLocal = server->GetActiveConnection()->IsLocal();
-  
-  /* Note that we are building a HTTP URL here, because XBMC will pass the
-   * URL directly to FFMPEG, and as we all know, ffmpeg doesn't handle
-   * plexserver:// protocol */
-  CURL tURL = server->BuildURL("/video/:/transcode/universal/start.m3u8");
-  
+
+  CURL tURL;
+
+  switch (getServerTranscodeMode(server))
+  {
+    case PLEX_TRANSCODE_MODE_HLS:
+    {
+      tURL = server->BuildURL("/video/:/transcode/universal/start.m3u8");
+      tURL.SetOption("protocol", "hls");
+      tURL.SetOption("fastSeek", "1");
+
+      /* since we are passing the URL to FFMPEG we need to pass our
+       * headers as well */
+      std::vector<stringPair> hdrs = XFILE::CPlexFile::GetHeaderList();
+      BOOST_FOREACH(stringPair p, hdrs)
+      {
+        // Let's ignore X-Plex-Client-Capabilities, ffmpeg is cranky about {}
+        if (p.first == "X-Plex-Client-Capabilities")
+          continue;
+
+        tURL.SetOption(p.first, p.second);
+      }
+      break;
+    }
+
+    case PLEX_TRANSCODE_MODE_MKV:
+    {
+      tURL = server->BuildPlexURL("/video/:/transcode/universal/start.mkv");
+      tURL.SetOption("protocol", "http");
+      tURL.SetOption("copyts", "1");
+
+      if (item.HasProperty("viewOffset") &&
+          item.m_lStartOffset == STARTOFFSET_RESUME)
+      {
+        int offset = item.GetProperty("viewOffset").asInteger() / 1000;
+        tURL.SetOption("offset", boost::lexical_cast<std::string>(offset));
+      }
+      else if (item.HasProperty("viewOffsetSeek"))
+      {
+        // Here we handle seek offset for Matroska seeking
+        // Define transcoder start point
+        int offset = item.GetProperty("viewOffsetSeek").asInteger() / 1000;
+        tURL.SetOption("offset", boost::lexical_cast<std::string>(offset));
+      }
+      break;
+    }
+
+    default:
+    {
+      CLog::Log(LOGERROR,"CPlexTranscoderClient::GetTranscodeURL : item Transcode mode is unknown");
+      break;
+    }
+  }
+
   tURL.SetOption("path", item.GetProperty("unprocessed_key").asString());
   tURL.SetOption("session", g_guiSettings.GetString("system.uuid"));
-  tURL.SetOption("protocol", "hls");
   tURL.SetOption("directPlay", "0");
   tURL.SetOption("directStream", "1");
+
 
   CFileItemPtr mediaItem = CPlexMediaDecisionEngine::getSelectedMediaItem(item);
   if (mediaItem)
@@ -210,19 +331,11 @@ CURL CPlexTranscoderClient::GetTranscodeURL(CPlexServerPtr server, const CFileIt
   if (mediaItem->m_selectedMediaPart)
     tURL.SetOption("partIndex", mediaItem->m_selectedMediaPart->GetProperty("partIndex").asString());
   
-  /*
-  if (item.HasProperty("viewOffset"))
-  {
-    int offset = item.GetProperty("viewOffset").asInteger() / 1000;
-    tURL.SetOption("offset", boost::lexical_cast<std::string>(offset));
-  }*/
-  tURL.SetOption("fastSeek", "1");
-  
-  std::string bitrate = GetCurrentBitrate(isLocal);
+  std::string bitrate = GetInstance()->GetCurrentBitrate(isLocal);
   tURL.SetOption("maxVideoBitrate", bitrate);
   tURL.SetOption("videoQuality", _qualities[bitrate]);
   tURL.SetOption("videoResolution", _resolutions[bitrate]);
-  
+
   /* PHT can render subtitles itself no need to include them in the transcoded video
    * UNLESS it's a embedded subtitle, we can't extract it from the file or UNLESS the
    * user have checked the always transcode subtitles option in settings */
@@ -236,34 +349,6 @@ CURL CPlexTranscoderClient::GetTranscodeURL(CPlexServerPtr server, const CFileIt
     }
   }
   
-  CStdString extraAudioFormats;
-  int audioMode = g_guiSettings.GetInt("audiooutput.mode");
-  
-  if (AUDIO_IS_BITSTREAM(audioMode))
-  {
-    if (g_guiSettings.GetBool("audiooutput.ac3passthrough"))
-    {
-      extraAudioFormats += "add-transcode-target-audio-codec(type=videoProfile&context=streaming&protocol=hls&audioCodec=ac3)";
-      extraAudioFormats += "+add-transcode-target-audio-codec(type=videoProfile&context=streaming&protocol=hls&audioCodec=eac3)";
-    }
-    
-    if (g_guiSettings.GetBool("audiooutput.dtspassthrough"))
-    {
-      if (!extraAudioFormats.empty())
-        extraAudioFormats+="+";
-      extraAudioFormats += "add-transcode-target-audio-codec(type=videoProfile&context=streaming&protocol=hls&audioCodec=dca)";
-    }
-    
-    if (!extraAudioFormats.empty())
-      tURL.SetOption("X-Plex-Client-Profile-Extra", extraAudioFormats);
-  }
-  
-  /* since we are passing the URL to FFMPEG we need to pass our 
-   * headers as well */
-  std::vector<stringPair> hdrs = XFILE::CPlexFile::GetHeaderList();
-  BOOST_FOREACH(stringPair p, hdrs)
-    tURL.SetOption(p.first, p.second);
-  
   return tURL;
 }
 
@@ -271,4 +356,51 @@ CURL CPlexTranscoderClient::GetTranscodeURL(CPlexServerPtr server, const CFileIt
 std::string CPlexTranscoderClient::GetCurrentSession()
 {
   return g_guiSettings.GetString("system.uuid");
+}
+
+///////////////////////////////////////////////////////////////////////////////
+CPlexTranscoderClient::PlexTranscodeMode CPlexTranscoderClient::getServerTranscodeMode(const CPlexServerPtr& server)
+{
+  if (!server)
+    return PLEX_TRANSCODE_MODE_UNKNOWN;
+
+  if (g_advancedSettings.m_bUseMatroskaTranscodes)
+  {
+    CPlexServerVersion serverVersion(server->GetVersion());
+    CPlexServerVersion needVersion("0.9.9.7.435-abc123");
+    if (serverVersion > needVersion)
+      return PLEX_TRANSCODE_MODE_MKV;
+  }
+
+  // default to HLS
+  return PLEX_TRANSCODE_MODE_HLS;
+}
+
+///////////////////////////////////////////////////////////////////////////////
+CPlexTranscoderClient::PlexTranscodeMode CPlexTranscoderClient::getItemTranscodeMode(const CFileItem& item)
+{
+  CFileItemPtr pItem(new CFileItem(item));
+  CPlexServerPtr pServer = g_plexApplication.serverManager->FindFromItem(pItem);
+  return getServerTranscodeMode(pServer);
+}
+
+///////////////////////////////////////////////////////////////////////////////
+CPlexTranscoderClient *CPlexTranscoderClient::GetInstance()
+{
+   if (!_Instance)
+  {
+#if defined(TARGET_RASPBERRY_PI)
+    _Instance = new CPlexTranscoderClientRPi();
+#else
+    _Instance = new CPlexTranscoderClient();
+#endif
+  }
+  return _Instance;
+}
+
+///////////////////////////////////////////////////////////////////////////////
+void CPlexTranscoderClient::DeleteInstance()
+{
+  if (_Instance)
+    delete _Instance;
 }

@@ -152,6 +152,23 @@ CPlexDirectoryTypeParserTrack::Process(CFileItem &item, CFileItem &mediaContaine
   }
 
   item.SetFromSong(song);
+
+  if (item.HasProperty("playQueueItemID"))
+  {
+    item.GetMusicInfoTag()->SetDatabaseId(item.GetProperty("playQueueItemID").asInteger(), "video");
+  }
+  else if (item.HasProperty("ratingKey"))
+  {
+    item.GetMusicInfoTag()->SetDatabaseId(item.GetProperty("ratingKey").asInteger(), "video");
+  }
+  else
+  {
+    int id = mediaContainer.GetProperty("__containerItemIndex").asInteger(0);
+    // ok, this is probably a channel, we still need a pretty unique id, so let's
+    // just try to get unique id for this certain container
+    item.GetMusicInfoTag()->SetDatabaseId(id, "video");
+    mediaContainer.SetProperty("__containerItemIndex", ++ id);
+  }
 }
 
 void CPlexDirectoryTypeParserArtist::Process(CFileItem &item, CFileItem &mediaContainer, XML_ELEMENT *itemElement)
@@ -171,7 +188,6 @@ void CPlexDirectoryTypeParserArtist::Process(CFileItem &item, CFileItem &mediaCo
 
   item.GetMusicInfoTag()->SetArtist(artist);
 
-  int thumbIdx = 0;
   #ifdef USE_RAPIDXML
   for (XML_ELEMENT *el = itemElement->first_node(); el; el = el->next_sibling())
   #else
@@ -183,7 +199,7 @@ void CPlexDirectoryTypeParserArtist::Process(CFileItem &item, CFileItem &mediaCo
     if (tagItem &&
         tagItem->GetPlexDirectoryType() == PLEX_DIR_TYPE_GENRE)
       ParseTag(item, *tagItem.get());
-    else if (tagItem && tagItem->GetPlexDirectoryType() == PLEX_DIR_TYPE_THUMB)
-      item.SetArt(PLEX_ART_THUMB, thumbIdx ++, tagItem->GetPath());
   }
+
+  item.GetMusicInfoTag()->SetDatabaseId(item.GetProperty("ratingKey").asInteger(), "artist");
 }

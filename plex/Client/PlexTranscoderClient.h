@@ -21,17 +21,35 @@
 
 class CPlexTranscoderClient
 {
+private:
+    static CPlexTranscoderClient *_Instance;
+
 public:
-  CPlexTranscoderClient();
+    
+    enum PlexTranscodeMode
+    {
+      PLEX_TRANSCODE_MODE_UNKNOWN = 0,
+      PLEX_TRANSCODE_MODE_HLS = 1,
+      PLEX_TRANSCODE_MODE_MKV = 2
+    };
+
+  CPlexTranscoderClient() {}
+  virtual ~CPlexTranscoderClient() {}
+  static CPlexTranscoderClient *GetInstance();
+  static void DeleteInstance();
   static int SelectATranscoderQuality(CPlexServerPtr server, int currentQuality = 0);
   static std::string GetPrettyBitrate(int br);
-  static bool ShouldTranscode(CPlexServerPtr server, const CFileItem& item);
+  virtual bool ShouldTranscode(CPlexServerPtr server, const CFileItem& item);
   static CURL GetTranscodeURL(CPlexServerPtr server, const CFileItem& item);
-  static std::string GetCurrentBitrate(bool local);
+  virtual std::string GetCurrentBitrate(bool local);
   static std::string GetCurrentSession();
   static PlexIntStringMap getOnlineQualties();
   static int SelectAOnlineQuality(int currentQuality);
   static int getBandwidthForQuality(int quality);
+  static PlexTranscodeMode getServerTranscodeMode(const CPlexServerPtr& server);
+  static PlexTranscodeMode getItemTranscodeMode(const CFileItem& item);
+  static int getIntegerRepresentation(int qualitySetting);
+  static int autoSelectQuality(const CFileItem &file, int target);
 };
 
 #endif /* defined(__Plex_Home_Theater__PlexTranscoderClient__) */

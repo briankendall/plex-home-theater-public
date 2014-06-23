@@ -318,7 +318,9 @@ long CCurlFile::CReadState::Connect(unsigned int size)
   m_stillRunning = 1;
   if (!FillBuffer(1))
   {
+#ifndef __PLEX__
     CLog::Log(LOGERROR, "CCurlFile::CReadState::Open, didn't get any data from stream.");
+#endif
     return -1;
   }
 
@@ -386,6 +388,7 @@ CCurlFile::CCurlFile()
 
   /* PLEX */
   m_clearCookies = false;
+  m_userAgent = PLEX_HOME_THEATER_USER_AGENT;
   /* END PLEX */
 }
 

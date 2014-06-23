@@ -82,6 +82,7 @@
 #include "Client/PlexServerManager.h"
 #include "plex/PlexApplication.h"
 #include "ViewDatabase.h"
+#include "GUI/GUIDialogPlexError.h"
 /* END PLEX */
 
 #define CONTROL_BTNVIEWASICONS       2
@@ -106,7 +107,11 @@ CGUIMediaWindow::CGUIMediaWindow(int id, const char *xmlFile)
     : CGUIWindow(id, xmlFile)
 {
   m_loadType = KEEP_IN_MEMORY;
+#ifndef __PLEX__
   m_vecItems = new CFileItemList;
+#else
+  m_vecItems = CFileItemListPtr(new CFileItemList);
+#endif
   m_unfilteredItems = new CFileItemList;
   m_vecItems->SetPath("?");
   m_iLastControl = -1;
@@ -118,7 +123,9 @@ CGUIMediaWindow::CGUIMediaWindow(int id, const char *xmlFile)
 
 CGUIMediaWindow::~CGUIMediaWindow()
 {
+#ifndef __PLEX__
   delete m_vecItems;
+#endif
   delete m_unfilteredItems;
 }
 
@@ -839,12 +846,16 @@ bool CGUIMediaWindow::Update(const CStdString &strDirectory, bool updateFilterPa
 
     ClearFileItems();
     m_vecItems->ClearProperties();
-    m_vecItems->RemoveArt(PLEX_ART_THUMB);
 
     if (items.m_wasListingCancelled == false)
+    {
       CLog::Log(LOGERROR,"CGUIMediaWindow::GetDirectory(%s) failed", strDirectory.c_str());
+      CGUIDialogPlexError::ShowError("GetDirectory Failed for :", strDirectory,"","");
+    }
     else
+    {
       CLog::Log(LOGINFO,"CGUIMediaWindow::GetDirectory(%s) was canceled", strDirectory.c_str());
+    }
 
 #ifndef __PLEX__
     CLog::Log(LOGERROR,"CGUIMediaWindow::GetDirectory(%s) failed", strDirectory.c_str());

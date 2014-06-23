@@ -317,7 +317,8 @@ void CGUISettings::Initialize()
   AddInt(NULL, "input.appleremotesequencetime", 13603, 500, 50, 50, 1000, SPIN_CONTROL_INT_PLUS, MASK_MS, TEXT_OFF);
   AddSeparator(in, "input.sep1");
 #endif
-  AddBool(in, "input.remoteaskeyboard", 21449, false);
+  /* PLEX - Defaulted to true */
+  AddBool(in, "input.remoteaskeyboard", 21449, true);
 #if defined(TARGET_DARWIN_IOS)
   AddBool(NULL, "input.enablemouse", 21369, false);
 #else
@@ -897,6 +898,12 @@ void CGUISettings::Initialize()
   AddBool(NULL, "videoplayer.usepbo", 13424, true);
 #endif
 
+#ifdef TARGET_RASPBERRY_PI
+  AddBool(adv, "videoplayer.useffmpegavio", 44406, true);
+#else
+  AddBool(adv, "videoplayer.useffmpegavio", 44406, false);
+#endif
+
 
   // Plex "Network" Settings
   AddGroup(SETTINGS_SERVICE, 14036);
@@ -996,7 +1003,9 @@ void CGUISettings::Initialize()
   AddInt(adva, "lookandfeel.skinzoom",20109, 0, -20, 2, 20, SPIN_CONTROL_INT, MASK_PERCENT);
   AddInt(NULL, "lookandfeel.startupwindow",512,1, WINDOW_HOME, 1, WINDOW_PYTHON_END, SPIN_CONTROL_TEXT);
   AddString(adva, "lookandfeel.soundskin",15108,"SKINDEFAULT", SPIN_CONTROL_TEXT);
+#ifndef __PLEX__
   AddBool(adva, "lookandfeel.enableglobalslideshow", 15150, true);
+#endif
   AddString(adva, "locale.charset", 14091, "DEFAULT", SPIN_CONTROL_TEXT); // charset is set by the language file
 
 //  AddCategory(SETTINGS_APPEARANCE, "window", 0);
@@ -1012,6 +1021,7 @@ void CGUISettings::Initialize()
 
   AddString(NULL, "system.uuid", 99999, s.str().c_str(), SPIN_CONTROL_TEXT);
   AddBool(NULL, "system.firstrunwizard", 0, false, 1);
+  AddString(NULL, "system.mostrecentplayqueue", 0, "", SPIN_CONTROL_TEXT);
 }
 
 CGUISettings::~CGUISettings(void)

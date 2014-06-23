@@ -46,6 +46,7 @@ public:
   CStdString toString() const;
 
   bool HasActiveLocalConnection() const;
+  CPlexConnectionPtr GetLocalConnection() const;
   void MarkAsRefreshing();
   bool MarkUpdateFinished(int connType);
 
@@ -69,10 +70,10 @@ public:
   CPlexConnectionPtr GetActiveConnection() const;
   CURL GetActiveConnectionURL() const;
 
-  bool operator== (const CPlexServer& otherServer) { return m_uuid.Equals(otherServer.m_uuid); }
+  bool Equals(const CPlexServerPtr& otherServer) { return m_uuid.Equals(otherServer->m_uuid); }
 
   /* ConnTestThread */
-  void OnConnectionTest(CPlexConnectionPtr conn, int state);
+  void OnConnectionTest(CPlexServerConnTestThread *thread, CPlexConnectionPtr conn, int state);
 
   void GetConnections(std::vector<CPlexConnectionPtr> &conns);
   int GetNumConnections() const;
@@ -85,7 +86,9 @@ public:
   void SetName(const CStdString &name) { m_name = name; }
   void SetOwned(bool owned) { m_owned = owned; }
   void SetOwner(const CStdString &owner) { m_owner = owner; }
+  void SetSynced(bool synced) { m_synced = synced; }
   void SetVersion(const CStdString& version) { m_version = version; }
+  void SetServerClass(const CStdString& classStr) { m_serverClass = classStr; }
   void SetSupportsVideoTranscoding(bool support) { m_supportsVideoTranscoding = support; }
   void SetSupportsAudioTranscoding(bool support) { m_supportsAudioTranscoding = support; }
   void SetSupportsDeletion(bool support) { m_supportsDeletion = support; }
@@ -109,6 +112,11 @@ public:
 
   uint64_t GetLastRefreshed() const { return m_lastRefreshed; }
   void DidRefresh() { m_lastRefreshed = XbmcThreads::SystemClockMillis(); }
+
+  bool IsSecondary() const
+  {
+    return (m_serverClass == "secondary");
+  }
 
 private:
   bool m_owned;

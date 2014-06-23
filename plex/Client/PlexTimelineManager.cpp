@@ -18,8 +18,10 @@
 
 #include "Client/PlexServer.h"
 #include "Client/PlexServerManager.h"
+#include "Playlists/PlexPlayQueueManager.h"
 
 #include "FileItem.h"
+#include "DirectoryCache.h"
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 CPlexTimelineManager::CPlexTimelineManager() : m_stopped(false), m_textFieldFocused(false), m_textFieldSecure(false)
@@ -92,7 +94,7 @@ void CPlexTimelineManager::SetTextFieldFocused(bool focused, const CStdString &n
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////
-void CPlexTimelineManager::UpdateLocation()
+void CPlexTimelineManager::RefreshSubscribers()
 {
   SendTimelineToSubscribers(GetCurrentTimeLines());
 }
@@ -152,7 +154,7 @@ void CPlexTimelineManager::ReportProgress(const CFileItemPtr &newItem, ePlexMedi
 
       ReportProgress(oldTimeline, true);
     }
-  }
+ }
 
   /* now we need to check the other types because we can start
    * playing a video when music is playing which will stop the music
@@ -181,7 +183,13 @@ void CPlexTimelineManager::ReportProgress(const CFileItemPtr &newItem, ePlexMedi
   ReportProgress(timeline, reallyForce);
 
   if (timeline->getState() == PLEX_MEDIA_STATE_STOPPED)
-    ResetTimeline(type);
+  {
+    /* Now we need to make sure that if this item is cached it's removed */
+    if (timeline->getItem())
+      g_directoryCache.ClearDirWithFile(timeline->getItem()->GetProperty("key").asString());
+
+     ResetTimeline(type);
+  }
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////

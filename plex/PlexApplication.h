@@ -19,6 +19,7 @@
 #include "network/UdpClient.h"
 #include "FileItem.h"
 #include "Utility/PlexGlobalTimer.h"
+#include "PlexBusyIndicator.h"
 
 #ifdef TARGET_DARWIN_OSX
 #include "Helper/PlexHTHelper.h"
@@ -64,62 +65,80 @@ typedef boost::shared_ptr<CPlexProfiler> CPlexProfilerPtr;
 
 class CPlexExtraInfoLoader;
 
+class CPlexPlayQueueManager;
+typedef boost::shared_ptr<CPlexPlayQueueManager> CPlexPlayQueueManagerPtr;
+
 ///
 /// The hub of all Plex goodness.
 ///
-class PlexApplication : public IMsgTargetCallback, public ANNOUNCEMENT::IAnnouncer, public IPlexGlobalTimeout, public CUdpClient
+class PlexApplication : public IMsgTargetCallback,
+                        public ANNOUNCEMENT::IAnnouncer,
+                        public IPlexGlobalTimeout,
+                        public CUdpClient
 {
 public:
-  PlexApplication() : myPlexManager(NULL), remoteSubscriberManager(NULL), m_networkLoggingOn(false) {};
+  PlexApplication()
+    : myPlexManager(NULL), remoteSubscriberManager(NULL), m_networkLoggingOn(false) {};
   void Start();
 
   /// Destructor
-  virtual ~PlexApplication() {}
-  
+  virtual ~PlexApplication()
+  {
+  }
+
   /// Handle internal messages.
-  virtual bool OnMessage(CGUIMessage& message);
+  virtual bool OnMessage(CGUIMessage& message) { return false; };
 
   void OnWakeUp();
 
   void FailAddToPacketRender();
 
   void ForceVersionCheck();
-  CPlexServiceListenerPtr GetServiceListener() const { return m_serviceListener; }
-  
+  CPlexServiceListenerPtr GetServiceListener() const
+  {
+    return m_serviceListener;
+  }
+
   CFileItemPtr m_preplayItem;
-  
-  CMyPlexManager *myPlexManager;
+
+  CMyPlexManager* myPlexManager;
   CPlexServerManagerPtr serverManager;
-  CPlexRemoteSubscriberManager *remoteSubscriberManager;
+  CPlexRemoteSubscriberManager* remoteSubscriberManager;
   CPlexMediaServerClientPtr mediaServerClient;
   CPlexServerDataLoaderPtr dataLoader;
   CPlexThemeMusicPlayerPtr themeMusicPlayer;
-  CPlexAnalytics *analytics;
+  CPlexAnalytics* analytics;
 #ifdef ENABLE_AUTOUPDATE
   CPlexAutoUpdate* autoUpdater;
 #endif
-  CPlexTimelineManagerPtr timelineManager;  
-  CPlexThumbCacher *thumbCacher;
+  CPlexTimelineManagerPtr timelineManager;
+  CPlexThumbCacher* thumbCacher;
   CPlexFilterManagerPtr filterManager;
   CPlexProfilerPtr profiler;
-  CPlexGlobalTimer timer;
-  CPlexExtraInfoLoader *extraInfo;
+  CPlexGlobalTimerPtr timer;
+  CPlexExtraInfoLoader* extraInfo;
+  CPlexPlayQueueManagerPtr playQueueManager;
+  CPlexBusyIndicator busy;
 
   void setNetworkLogging(bool);
   void OnTimeout();
-  CStdString TimerName() const { return "plexApplication"; }
+  CStdString TimerName() const
+  {
+    return "plexApplication";
+  }
   void sendNetworkLog(int level, const std::string& logline);
   void Shutdown();
   void preShutdown();
 
-  private:
+private:
   /// Members
   CPlexServiceListenerPtr m_serviceListener;
   CStdString m_ipAddress;
   bool m_networkLoggingOn;
   bool m_triedToRestart;
-  
-  virtual void Announce(ANNOUNCEMENT::AnnouncementFlag flag, const char *sender, const char *message, const CVariant &data);
+
+  virtual void Announce(ANNOUNCEMENT::AnnouncementFlag flag, const char* sender,
+                        const char* message, const CVariant& data);
 };
 
 XBMC_GLOBAL_REF(PlexApplication, g_plexApplication);

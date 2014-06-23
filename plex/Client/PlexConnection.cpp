@@ -58,7 +58,9 @@ CPlexConnection::TestReachability(CPlexServerPtr server)
   }
   else
   {
-    if (m_http.GetLastHTTPResponseCode() == 401)
+    if (m_http.DidCancel())
+      m_state = CONNECTION_STATE_UNKNOWN;
+    else if (m_http.GetLastHTTPResponseCode() == 401)
       m_state = CONNECTION_STATE_UNAUTHORIZED;
     else
       m_state = CONNECTION_STATE_UNREACHABLE;
@@ -77,10 +79,15 @@ CPlexConnection::Merge(CPlexConnectionPtr otherConnection)
   m_refreshed = true;
 }
 
-bool CPlexConnection::operator ==(const CPlexConnection &other)
+bool CPlexConnection::Equals(const CPlexConnectionPtr &other)
 {
-  bool uriMatches = m_url.Get().Equals(other.GetAddress().Get());
-  bool tokenMatches = GetAccessToken().Equals(other.GetAccessToken());
+  if (!other) return false;
+
+  CStdString url1 = m_url.Get();
+  CStdString url2 = other->m_url.Get();
+
+  bool uriMatches = url1.Equals(url2);
+  bool tokenMatches = m_token.Equals(other->m_token);
 
   return (uriMatches && tokenMatches);
 }

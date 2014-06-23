@@ -35,6 +35,10 @@
 #include "guilib/LocalizeStrings.h"
 #include "interfaces/AnnouncementManager.h"
 
+/* PLEX */
+#include "plex/GUI/GUIDialogPlexError.h"
+/* END PLEX */
+
 using namespace PLAYLIST;
 
 CPlayListPlayer::CPlayListPlayer(void)
@@ -50,12 +54,6 @@ CPlayListPlayer::CPlayListPlayer(void)
     m_repeatState[i] = REPEAT_NONE;
   m_iFailedSongs = 0;
   m_failedSongsStart = 0;
-
-  /* PLEX */
-  m_bQueuedFirstFile = false;
-  m_bPreviousMusicShuffle = false;
-  m_bTemporaryShuffle = false;
-  /* END PLEX */
 }
 
 CPlayListPlayer::~CPlayListPlayer(void)
@@ -279,7 +277,13 @@ bool CPlayListPlayer::Play(int iSong, bool bAutoPlay /* = false */, bool bPlayPr
       CLog::Log(LOGDEBUG,"Playlist Player: one or more items failed to play... aborting playback");
 
       // open error dialog
+      /* PLEX */
+#ifdef __PLEX__
+      CGUIDialogPlexError::ShowError(16026, 16027, 16029, 0);
+#else
       CGUIDialogOK::ShowAndGetInput(16026, 16027, 16029, 0);
+#endif
+      /*END PLEX */
 
       CGUIMessage msg(GUI_MSG_PLAYLISTPLAYER_STOPPED, 0, 0, m_iCurrentPlayList, m_iCurrentSong);
       g_windowManager.SendThreadMessage(msg);
@@ -311,6 +315,13 @@ bool CPlayListPlayer::Play(int iSong, bool bAutoPlay /* = false */, bool bPlayPr
   // reset the start offset of this item
   if (item->m_lStartOffset == STARTOFFSET_RESUME)
       item->m_lStartOffset = 0;
+
+  /* PLEX */
+  if (m_iCurrentPlayList == PLAYLIST_VIDEO && m_bPlayedFirstFile)
+    CGUIDialogKaiToast::QueueNotification(CGUIDialogKaiToast::Info,
+                                          g_localizeStrings.Get(13350),
+                                          g_application.CurrentFileItemPtr()->GetLabel(), 2500L, false);
+  /* END PLEX */
 
   // TODO - move the above failure logic and the below success logic
   //        to callbacks instead so we don't rely on the return value
@@ -365,14 +376,6 @@ void CPlayListPlayer::ClearPlaylist(int iPlaylist)
   // its likely that the playlist changed
   CGUIMessage msg(GUI_MSG_PLAYLIST_CHANGED, 0, 0);
   g_windowManager.SendMessage(msg);
-
-  /* PLEX */
-  if (m_bTemporaryShuffle && (iPlaylist == PLAYLIST_MUSIC))
-  {
-    Reset();
-    SetShuffle(PLAYLIST_MUSIC, m_bPreviousMusicShuffle, false);
-  }
-  /* END PLEX */
 }
 
 CPlayList& CPlayListPlayer::GetPlaylist(int iPlaylist)
@@ -423,10 +426,6 @@ void CPlayListPlayer::Reset()
   m_bPlayedFirstFile = false;
   m_bPlaybackStarted = false;
 
-  /* PLEX */
-  m_bQueuedFirstFile = false;
-  /* END PLEX */
-
   // its likely that the playlist changed
   CGUIMessage msg(GUI_MSG_PLAYLIST_CHANGED, 0, 0);
   g_windowManager.SendMessage(msg);
@@ -451,7 +450,7 @@ bool CPlayListPlayer::RepeatedOne(int iPlaylist) const
   return false;
 }
 
-void CPlayListPlayer::SetShuffle(int iPlaylist, bool bYesNo, bool bNotify /* = false */, bool bTemporary /* = false */)
+void CPlayListPlayer::SetShuffle(int iPlaylist, bool bYesNo, bool bNotify /* = false */)
 {
   if (iPlaylist != PLAYLIST_MUSIC && iPlaylist != PLAYLIST_VIDEO)
     return;
@@ -459,15 +458,6 @@ void CPlayListPlayer::SetShuffle(int iPlaylist, bool bYesNo, bool bNotify /* = f
   // disable shuffle in party mode
   if (g_partyModeManager.IsEnabled() && iPlaylist == PLAYLIST_MUSIC)
     return;
-
-  /* PLEX */
-  if (iPlaylist == PLAYLIST_MUSIC)
-  {
-    m_bTemporaryShuffle = bTemporary;
-    if (bTemporary)
-      m_bPreviousMusicShuffle = IsShuffled(PLAYLIST_MUSIC);
-  }
-  /* END PLEX */
 
   // do we even need to do anything?
   if (bYesNo != IsShuffled(iPlaylist))
@@ -682,12 +672,6 @@ void CPlayListPlayer::Clear()
 {
   if (m_PlaylistMusic)
     m_PlaylistMusic->Clear();
-
-  /* PLEX */
-  if (m_PlaylistMusic && m_bTemporaryShuffle)
-    SetShuffle(PLAYLIST_MUSIC, m_bPreviousMusicShuffle, false);
-  /* END PLEX */
-
   if (m_PlaylistVideo)
     m_PlaylistVideo->Clear();
   if (m_PlaylistEmpty)

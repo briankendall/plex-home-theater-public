@@ -62,6 +62,8 @@
 #include "plex/PlexTypes.h"
 #include "PlexApplication.h"
 #include "filesystem/DirectoryCache.h"
+#include "FileSystem/PlexFile.h"
+#include <boost/foreach.hpp>
 /* END PLEX */
 
 using namespace std;
@@ -913,8 +915,9 @@ bool CFileItem::IsDiscStub() const
 bool CFileItem::IsAudio() const
 {
   /* PLEX */
-  string type = GetProperty("album_type").asString();
-  if (type == "track")
+  if (m_plexDirectoryType == PLEX_DIR_TYPE_TRACK ||
+      m_plexDirectoryType == PLEX_DIR_TYPE_ALBUM ||
+      m_plexDirectoryType == PLEX_DIR_TYPE_ARTIST)
     return true;
   /* END PLEX */
 
@@ -1458,70 +1461,25 @@ const CStdString& CFileItem::GetMimeType(bool lookup /*= true*/) const
     // discard const qualifyier
     CStdString& m_ref = (CStdString&)m_mimetype;
 
+    /* PLEX */
+    CURL url = GetAsUrl();
+    if (url.GetProtocol() == "plexserver" ||
+        // We also need to check for transcoder URL's since they are translated
+        // to HTTP already (ffmpeg doesn't like plexserver:// url's
+        boost::starts_with(url.GetFileName(), "video/:/transcode"))
+      m_ref = XFILE::CPlexFile::GetMimeType(GetAsUrl());
+    else
+    /* END PLEX */
+
     if( m_bIsFolder )
       m_ref = "x-directory/normal";
     else if( m_pvrChannelInfoTag )
       m_ref = m_pvrChannelInfoTag->InputFormat();
     else if( m_strPath.Left(8).Equals("shout://")
           || m_strPath.Left(7).Equals("http://")
-          /* PLEX */
-          || m_strPath.Left(13).Equals("plexserver://")
-          /* END PLEX */
           || m_strPath.Left(8).Equals("https://"))
     {
-      /* PLEX */
-      int start = 0;
-      if (IsPlexMediaServer() && m_strPath.size() > 8 && (start=m_strPath.find("/", 8)))
-      {
-        CStdString path = m_strPath.substr(start);
-        if (path.substr(0, 6) == "/video")
-          m_ref = "video/unknown";
-        else if (path.substr(0, 6) == "/music")
-          m_ref = "audio/unknown";
-      }
-      else if (IsVideo())
-      {
-        m_ref = "video/unknown";
-      }
-      else if (IsAudio())
-      {
-        m_ref = "audio/unknown";
-      }
-
-      CStdString extension = URIUtils::GetExtension(m_strPath);
-      extension.MakeLower();
-
-      if (extension == ".m3u" || extension == ".strm")
-        m_ref = "audio/mpegurl";
-
-      else if (extension == ".pls")
-        m_ref = "audio/scpls";
-
-      else if (extension == ".wpl")
-        m_ref = "application/vnd.ms-wpl";
-
-      else if (extension == ".asx")
-        m_ref = "video/x-ms-asf";
-
-      else if (extension == ".ram")
-        m_ref = "audio/x-pn-realaudio";
-
-      else if (extension == ".m3u8")
-        m_ref = "application/x-mpegURL";
-
-      else
-      {
-        CCurlFile::GetMimeType(GetAsUrl(), m_ref);
-
-        // try to get mime-type again but with an NSPlayer User-Agent
-        // in order for server to provide correct mime-type.  Allows us
-        // to properly detect an MMS stream
-        if (m_ref.Left(11).Equals("video/x-ms-"))
-          CCurlFile::GetMimeType(GetAsUrl(), m_ref, "NSPlayer/11.00.6001.7000");
-      }
-      /* END PLEX */
-
-      // make sure there are no options set in mime-type
+     // make sure there are no options set in mime-type
       // mime-type can look like "video/x-ms-asf ; charset=utf8"
       int i = m_ref.Find(';');
       if(i>=0)
@@ -1898,6 +1856,7 @@ void CFileItemList::Assign(const CFileItemList& itemlist, bool append)
   m_displayMessageTitle = itemlist.m_displayMessageTitle;
   m_displayMessageContents = itemlist.m_displayMessageContents;
   m_chainedProviders = itemlist.m_chainedProviders;
+  m_plexDirectoryType = itemlist.m_plexDirectoryType;
   /* END PLEX */
 }
 
@@ -1921,6 +1880,7 @@ bool CFileItemList::Copy(const CFileItemList& items, bool copyItems /* = true */
   m_displayMessage = items.m_displayMessage;
   m_displayMessageTitle = items.m_displayMessageTitle;
   m_displayMessageContents = items.m_displayMessageContents;
+  m_plexDirectoryType = items.m_plexDirectoryType;
   /* END PLEX */
 
   if (copyItems)
@@ -3509,7 +3469,7 @@ bool CFileItem::IsPlexMediaServerMusic() const
         ret = true;
     }
 
-    if (GetProperty("type") == "track")
+    if (GetProperty("type") == "song")
       ret = true;
   }
 
@@ -3541,7 +3501,7 @@ void CFileItem::SetEpisodeData(int total, int watchedCount)
 
 bool CFileItemList::IsPlexMediaServerMusic() const
 {
-  if (GetContent() == "track" || GetContent() == "songs")
+  if (GetContent() == "song" || GetContent() == "songs")
     return true;
 
   return CFileItem::IsPlexMediaServerMusic();
@@ -3610,6 +3570,20 @@ void CFileItemList::Insert(int iIndex, CFileItemPtr pItem)
   {
     m_map.insert(MAPFILEITEMSPAIR(pItem->GetPath(), pItem));
   }
+}
+
+int CFileItemList::IndexOfItem(const CStdString& path)
+{
+  CSingleLock lk(m_lock);
+  int i = 0;
+  BOOST_FOREACH(CFileItemPtr item, m_items)
+  {
+    if (item->GetPath() == path)
+      return i;
+    i ++;
+  }
+
+  return -1;
 }
 
 /* END PLEX */

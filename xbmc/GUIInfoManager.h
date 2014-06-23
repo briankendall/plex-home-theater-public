@@ -113,6 +113,9 @@ namespace INFO
 #define PLAYER_CAN_SEEK              51
 #define PLAYER_START_TIME            52
 #define PLAYER_TITLE                 53
+/* PLEX */
+#define PLAYER_ONNEW                 54
+/* END PLEX */
 
 #define WEATHER_CONDITIONS          100
 #define WEATHER_TEMPERATURE         101
@@ -292,6 +295,10 @@ namespace INFO
 /* PLEX */
 #define VIDEOPLAYER_AUDIOSTREAM       311
 #define VIDEOPLAYER_SUBTITLESTREAM    312
+#define VIDEOPLAYER_DURATION_STRING   313
+#define VIDEOPLAYER_PLEXCONTENT       314
+#define VIDEOPLAYER_PLEXCONTENT_STRING 315
+#define VIDEOPLAYER_HASNEXT           316
 /* END PLEX */
 
 #define AUDIOSCROBBLER_ENABLED      325
@@ -415,6 +422,9 @@ namespace INFO
 #define SYSTEM_IDLE_TIME            715
 #define SYSTEM_FRIENDLY_NAME        716
 #define SYSTEM_SCREENSAVER_ACTIVE   717
+/* PLEX */
+#define SYSTEM_PLEX_PLAYQUEUE       718
+/* END PLEX */
 
 #define LIBRARY_HAS_MUSIC           720
 #define LIBRARY_HAS_VIDEO           721
@@ -785,7 +795,9 @@ public:
 
   CStdString GetMusicLabel(int item);
   CStdString GetMusicTagLabel(int info, const CFileItem *item);
+#ifndef __PLEX__
   CStdString GetVideoLabel(int item);
+#endif
   CStdString GetPlaylistLabel(int item) const;
   CStdString GetMusicPartyModeLabel(int item);
   const CStdString GetMusicPlaylistInfo(const GUIInfo& info);
@@ -856,6 +868,8 @@ public:
   bool GetSeeking() const { return m_playerSeeking; };
   bool GetSlideshowShowDescription();
   void SetSlideshowShowDescription(bool show);
+  CStdString GetVideoLabel(int item, const CFileItemPtr& file = CFileItemPtr());
+  const CStdString GetVideoPlaylistInfo(const GUIInfo &info);
   /* END PLEX */
 
   /* Bri Bri */
@@ -990,6 +1004,7 @@ protected:
   CCriticalSection m_critInfo;
 
   /* PLEX */
+  int TranslateVideoPlayerString(const CStdString& info) const;
   bool GetItemBool(const CGUIListItem *item, int condition, int secondCondition=0) const;
   bool m_slideshowShowDescription;
   CMusicThumbLoader *m_musicThumbLoader;

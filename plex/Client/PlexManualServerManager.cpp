@@ -24,8 +24,10 @@ void CPlexManualServerManager::checkManualServersAsync()
   m_waitingForThreads = 1;
   m_manualServers.clear();
 
+#ifndef TARGET_RASPBERRY_PI
   CPlexServerPtr localServer = CPlexServerPtr(new CPlexServer(CPlexConnectionPtr(new CPlexConnection(CPlexConnection::CONNECTION_MANUAL, "127.0.0.1", 32400, "http"))));
   CJobManager::GetInstance().AddJob(new CPlexHTTPFetchJob(localServer->BuildURL("/"), localServer), this);
+#endif
 
   if (g_guiSettings.GetBool("plexmediaserver.manualaddress"))
   {
@@ -38,13 +40,13 @@ void CPlexManualServerManager::checkManualServersAsync()
     CJobManager::GetInstance().AddJob(new CPlexHTTPFetchJob(manualServer->BuildURL("/"), manualServer), this);
   }
 
-  g_plexApplication.timer.SetTimeout(1 * 60 * 1000, this);
+  g_plexApplication.timer->SetTimeout(1 * 60 * 1000, this);
 }
 
 void CPlexManualServerManager::OnTimeout()
 {
   checkManualServersAsync();
-  g_plexApplication.timer.SetTimeout(1 * 60 * 1000, this);
+  g_plexApplication.timer->SetTimeout(1 * 60 * 1000, this);
 }
 
 void CPlexManualServerManager::OnJobComplete(unsigned int jobID, bool success, CJob *job)

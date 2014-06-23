@@ -13,48 +13,28 @@
 #include "ApplicationMessenger.h"
 #include "GUI/GUIDialogPlexPluginSettings.h"
 #include "dialogs/GUIDialogOK.h"
+#include "PlexBusyIndicator.h"
+#include "PlexApplication.h"
+#include "Application.h"
 
 #include <boost/foreach.hpp>
 #include <boost/lexical_cast.hpp>
 
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////
-bool CPlexNavigationHelper::CacheUrl(const std::string& url, bool& cancel, bool closeDialog)
+bool CPlexNavigationHelper::CacheUrl(const std::string& url, bool& cancel)
 {
-
-  int id = CJobManager::GetInstance().AddJob(new CPlexDirectoryFetchJob(CURL(url)), this, CJob::PRIORITY_HIGH);
-
-  if (!m_cacheEvent.WaitMSec(300))
-  {
-    CGUIDialogBusy *busy = (CGUIDialogBusy*)g_windowManager.GetWindow(WINDOW_DIALOG_BUSY);
-    cancel = false;
-
-    if (busy)
-    {
-      m_cacheEvent.Reset();
-
-
-      if (!busy->IsActive())
-        busy->Show();
-      while (!m_cacheEvent.WaitMSec(10))
-      {
-        if (busy->IsCanceled())
-        {
-          CJobManager::GetInstance().CancelJob(id);
-          busy->Close();
-          cancel = true;
-          return false;
-        }
-
-        g_windowManager.ProcessRenderLoop();
-      }
-
-      if (closeDialog)
-        busy->Close();
-    }
-  }
-
+  cancel = g_plexApplication.busy.blockWaitingForJob(new CPlexDirectoryFetchJob(CURL(url)), this);
   return m_cacheSuccess;
+}
+
+///////////////////////////////////////////////////////////////////////////////////////////////////
+void CPlexNavigationHelper::navigateToNowPlaying()
+{
+  if (g_application.IsPlayingVideo())
+    g_windowManager.ActivateWindow(WINDOW_FULLSCREEN_VIDEO);
+  else if (g_application.IsPlayingAudio())
+    g_windowManager.ActivateWindow(WINDOW_NOW_PLAYING);
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////
@@ -189,15 +169,10 @@ CStdString CPlexNavigationHelper::navigateToItem(CFileItemPtr item, const CURL &
 void CPlexNavigationHelper::OnJobComplete(unsigned int jobID, bool success, CJob *job)
 {
   CPlexDirectoryFetchJob *fjob = static_cast<CPlexDirectoryFetchJob*>(job);
-  if (!fjob)
-    return;
-
-  if (success)
+  if (fjob && success)
     g_directoryCache.SetDirectory(fjob->m_url.Get(), fjob->m_items, XFILE::DIR_CACHE_ALWAYS);
 
-  m_cacheSuccess = success;
-  m_cacheEvent.Set();
-
+  m_cacheSuccess = fjob ? success : false;
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////

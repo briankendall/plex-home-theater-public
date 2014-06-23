@@ -13,34 +13,49 @@
 #include "FileSystem/PlexDirectory.h"
 #include "threads/Thread.h"
 #include "filesystem/CurlFile.h"
+#include "Job.h"
 
-class CPlexMediaDecisionEngine : public CThread
+class CPlexMediaDecisionJob : public CJob
 {
-  public:
-    CPlexMediaDecisionEngine() : CThread("MediaDecision"), m_success(false) {}
-    void Cancel();
+public:
+  CPlexMediaDecisionJob(const CFileItem& item) : m_item(item), m_success(false), m_bStop(false)
+  {
+  }
+  virtual void Cancel();
+  virtual bool DoWork();
+  CFileItem m_choosenMedia;
 
-    CFileItem m_choosenMedia;
-    bool m_success;
+private:
+  // allow override for tests.
+  virtual CFileItemPtr GetUrl(const CStdString &url);
+  virtual CFileItemPtr ResolveIndirect(CFileItemPtr item);
 
-    bool BlockAndResolve(const CFileItem &item, CFileItem &resolvedItem);
-    static void ProcessStack(const CFileItem& item, const CFileItemList& stack);
-    static CFileItemPtr getSelectedMediaItem(const CFileItem& item);
-    static CFileItemPtr getMediaPart(const CFileItem &item, int partId = -1);
+  CStdString GetPartURL(CFileItemPtr mediaPart);
+  void AddHeaders();
 
-  private:
-    virtual void Process();
-    CStdString GetPartURL(CFileItemPtr mediaPart);
+  bool m_success;
+  XFILE::CPlexDirectory m_dir;
+  XFILE::CCurlFile m_http;
 
-    void ChooseMedia();
-    CFileItemPtr ResolveIndirect(CFileItemPtr item);
-    void AddHeaders();
+  CFileItem m_item;
+  CEvent m_done;
+  bool m_bStop;
+};
 
-    XFILE::CPlexDirectory m_dir;
-    XFILE::CCurlFile m_http;
+class CPlexMediaDecisionEngine : public IJobCallback
+{
+public:
+  bool resolveItem(const CFileItem& item, CFileItem& resolvedItem);
+  static bool checkItemPlayability(const CFileItem& item);
+  static void ProcessStack(const CFileItem& item, const CFileItemList& stack);
+  static CFileItemPtr getSelectedMediaItem(const CFileItem& item);
+  static CFileItemPtr getMediaPart(const CFileItem& item, int partId = -1);
 
-    CFileItem m_item;
-    CEvent m_done;
+  virtual void OnJobComplete(unsigned int jobID, bool success, CJob* job);
+
+private:
+  bool m_success;
+  CFileItem m_resolvedItem;
 };
 
 #endif /* defined(__Plex_Home_Theater__PlexMediaDecisionEngine__) */

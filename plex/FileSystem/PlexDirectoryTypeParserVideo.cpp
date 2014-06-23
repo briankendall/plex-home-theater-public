@@ -16,6 +16,8 @@
 #include "AdvancedSettings.h"
 #include "guilib/LocalizeStrings.h"
 
+#include "music/tags/MusicInfoTag.h"
+
 #include <boost/foreach.hpp>
 
 using namespace XFILE;
@@ -141,10 +143,13 @@ CPlexDirectoryTypeParserVideo::Process(CFileItem &item, CFileItem &mediaContaine
   if (item.m_mediaItems.size() > 0)
   {
     CFileItemPtr firstMedia = item.m_mediaItems[0];
-    const boost::unordered_map<CStdString, CVariant> pMap;
+    const boost::unordered_map<CStdString, CVariant> pMap = firstMedia->GetAllProperties();
     std::pair<CStdString, CVariant> p;
     BOOST_FOREACH(p, pMap)
-      item.SetProperty(p.first, p.second);
+    {
+      if (!item.HasProperty(p.first))
+        item.SetProperty(p.first, p.second);
+    }
 
     /* also forward art, this is the mediaTags */
     item.AppendArt(firstMedia->GetArt());
@@ -152,6 +157,24 @@ CPlexDirectoryTypeParserVideo::Process(CFileItem &item, CFileItem &mediaContaine
   
   item.SetProperty("selectedAudioStream", PlexUtils::GetPrettyStreamName(item, true));
   item.SetProperty("selectedSubtitleStream", PlexUtils::GetPrettyStreamName(item, false));
+
+  // We misuse the MusicInfoTag a bit here so we can call PlayListPlayer::PlaySongId()
+  if (item.HasProperty("playQueueItemID"))
+  {
+    item.GetMusicInfoTag()->SetDatabaseId(item.GetProperty("playQueueItemID").asInteger(), "video");
+  }
+  else if (item.HasProperty("ratingKey"))
+  {
+    item.GetMusicInfoTag()->SetDatabaseId(item.GetProperty("ratingKey").asInteger(), "video");
+  }
+  else
+  {
+    int id = mediaContainer.GetProperty("__containerItemIndex").asInteger(0);
+    // ok, this is probably a channel, we still need a pretty unique id, so let's
+    // just try to get unique id for this certain container
+    item.GetMusicInfoTag()->SetDatabaseId(id, "video");
+    mediaContainer.SetProperty("__containerItemIndex", ++ id);
+  }
   
   //DebugPrintVideoItem(item);
 }
@@ -160,7 +183,6 @@ CPlexDirectoryTypeParserVideo::Process(CFileItem &item, CFileItem &mediaContaine
 void
 CPlexDirectoryTypeParserVideo::ParseMediaNodes(CFileItem &item, XML_ELEMENT *element)
 {
-  int thumbIdx = 0;
   int mediaIndex = 0;
 
 #ifndef USE_RAPIDXML
@@ -198,14 +220,12 @@ CPlexDirectoryTypeParserVideo::ParseMediaNodes(CFileItem &item, XML_ELEMENT *ele
 
       item.m_mediaItems.push_back(mediaItem);
     }
-    else if (mediaItem->GetPlexDirectoryType() == PLEX_DIR_TYPE_THUMB)
-    {
-      item.SetArt(PLEX_ART_THUMB, thumbIdx ++, mediaItem->GetPath());
-    }
   }
 
   if (item.m_mediaItems.size() == 0)
     item.SetProperty("isSynthesized", true);
+  else
+    item.SetProperty("isSynthesized", false);
 
   SetTagsAsProperties(item);
 }
@@ -275,7 +295,9 @@ void CPlexDirectoryTypeParserVideo::ParseTag(CFileItem &item, CFileItem &tagItem
   switch(tagItem.GetPlexDirectoryType())
   {
     case PLEX_DIR_TYPE_GENRE:
-      tag->m_genre.push_back(tagVal);
+      // limit to two genres for now
+      if (tag->m_genre.size() < 2)
+        tag->m_genre.push_back(tagVal);
       break;
     case PLEX_DIR_TYPE_WRITER:
       tag->m_writingCredits.push_back(tagVal);

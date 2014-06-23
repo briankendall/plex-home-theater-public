@@ -27,8 +27,8 @@ else()
 endif()
 
 set(PLEX_VERSION_MAJOR 1)
-set(PLEX_VERSION_MINOR 0)
-set(PLEX_VERSION_PATCH 11)
+set(PLEX_VERSION_MINOR 1)
+set(PLEX_VERSION_PATCH 3)
 if(DEFINED ENV{BUILD_NUMBER})
   set(PLEX_VERSION_BUILD "$ENV{BUILD_NUMBER}")
   set(PLEX_VERSION_BUILD_NR "$ENV{BUILD_NUMBER}")
@@ -60,6 +60,8 @@ add_subdirectory(lib)
 include_directories(
   ${CMAKE_CURRENT_BINARY_DIR}
   ${CMAKE_BINARY_DIR}/xbmc
+  ${root}/plex/Third-Party/gtest/include
+  ${root}/plex/Third-Party/gmock/include
 
   ${dependdir}/include
   ${dependdir}/include/libcec
@@ -91,8 +93,10 @@ if(TARGET_WIN32)
   )
 endif(TARGET_WIN32)
 
-# Build the texturepacker
-add_subdirectory(tools/TexturePacker)
+if(NOT TARGET_RPI)
+  # Build the texturepacker
+  add_subdirectory(tools/TexturePacker)
+endif()
 
 # add our visualizations
 add_subdirectory(xbmc/visualizations)

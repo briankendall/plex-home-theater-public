@@ -45,6 +45,8 @@
 #include "ApplicationMessenger.h"
 #include "PlexThemeMusicPlayer.h"
 #include "PlexJobs.h"
+#include "settings/GUISettings.h"
+#include "Playlists/PlexPlayQueueManager.h"
 
 #define CTL_LABEL_EDIT       310
 #define CTL_BUTTON_BACKSPACE 8
@@ -105,7 +107,7 @@ void CGUIWindowPlexSearch::OnTimeout()
   m_currentSearchString = str;
   BOOST_FOREACH(CPlexServerPtr server, list)
   {
-    if (!server->GetActiveConnection())
+    if (!server->GetActiveConnection() || server->GetSynced())
       continue;
 
     CURL u = server->BuildPlexURL("/search");
@@ -136,7 +138,7 @@ void CGUIWindowPlexSearch::UpdateSearch()
 
   if (!str.empty())
   {
-    g_plexApplication.timer.SetTimeout(SEARCH_DELAY, this);
+    g_plexApplication.timer->SetTimeout(SEARCH_DELAY, this);
   }
   else
     Reset();
@@ -268,7 +270,7 @@ bool CGUIWindowPlexSearch::OnClick(int senderId, int action)
                  fileItem->GetPlexDirectoryType() == PLEX_DIR_TYPE_TRACK ||
                  fileItem->GetPlexDirectoryType() == PLEX_DIR_TYPE_PHOTO))
             {
-              PlayPlexItem(fileItem);
+              g_plexApplication.playQueueManager->create(*fileItem);
               return true;
             }
           }
@@ -355,9 +357,19 @@ void CGUIWindowPlexSearch::InitWindow()
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 void CGUIWindowPlexSearch::ProcessResults(CFileItemList* results)
 {
-  CPlexServerPtr server = g_plexApplication.serverManager->FindFromItem(results->Get(0));
+  if (!results)
+    return;
+
+  CPlexServerPtr server = g_plexApplication.serverManager->FindFromItem(*results);
   if (server)
+  {
     CLog::Log(LOGDEBUG, "CGUIWindowPlexSearch::ProcessResults got response from %s", server->toString().c_str());
+  }
+  else
+  {
+    CLog::Log(LOGDEBUG, "CGUIWindowPlexSearch::ProcessResults got response from a non server URL: %s?", results->GetPath().c_str());
+    return;
+  }
 
   std::map<int, CFileItemListPtr> mappedRes;
   for (int i = 0; i < results->Size(); i ++)
@@ -384,8 +396,6 @@ void CGUIWindowPlexSearch::ProcessResults(CFileItemList* results)
     }
     else if (item && item->GetPlexDirectoryType() == PLEX_DIR_TYPE_PROVIDER)
     {
-      CLog::Log(LOGDEBUG, "CGUIWindowPlexSearch::ProcessResults got provider, sending additional requests");
-
       CURL u(item->GetPath());
       u.SetOption("query", m_currentSearchString);
       m_currentSearchId.push_back(CJobManager::GetInstance().AddJob(new CPlexDirectoryFetchJob(u), this, CJob::PRIORITY_LOW));
@@ -405,6 +415,8 @@ void CGUIWindowPlexSearch::ProcessResults(CFileItemList* results)
       BOOST_FOREACH(CGUIListItemPtr item, cList)
         list->AddFront(boost::static_pointer_cast<CFileItem>(item), i++);
 
+      CLog::Log(LOGDEBUG, "CPlexWindowSearch::ProcessResults adding %d items to %d from %s", list->Size(), pair.first, server->GetName().c_str());
+
       CGUIMessage msg(GUI_MSG_LABEL_BIND, GetID(), container->GetID(), 0, 0, list.get());
       OnMessage(msg);
 
@@ -412,7 +424,9 @@ void CGUIWindowPlexSearch::ProcessResults(CFileItemList* results)
       SET_CONTROL_VISIBLE(container->GetID() - 2000);
     }
     else
+    {
       CLog::Log(LOGDEBUG, "CGUIWindowPlexSearch::ProcessResults Could not find container %d", m_resultMap[pair.first]);
+    }
   }
 
   delete results;

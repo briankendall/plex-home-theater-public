@@ -12,6 +12,8 @@
 #include "PlayList.h"
 #include "StringUtils.h"
 #include "guilib/GUIWindowManager.h"
+#include "PlexPlayQueueManager.h"
+#include "music/tags/MusicInfoTag.h"
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 CUrlOptions CPlexTimeline::getTimeline(bool forServer)
@@ -30,7 +32,15 @@ CUrlOptions CPlexTimeline::getTimeline(bool forServer)
 
     options.AddOption("ratingKey", m_item->GetProperty("ratingKey").asString());
     options.AddOption("key", m_item->GetProperty("unprocessed_key").asString());
-    options.AddOption("containerKey", m_item->GetProperty("containerKey").asString());
+
+    CStdString container = m_item->GetProperty("containerKey").asString();
+
+    // We need to set our own container since the one from the item can be
+    // just /playQueues
+    if (m_item->HasProperty("playQueueID"))
+      container.Format("/playQueues/%s", m_item->GetProperty("playQueueID").asString());
+
+    options.AddOption("containerKey", container);
 
     if (m_item->HasProperty("guid"))
       options.AddOption("guid", m_item->GetProperty("guid").asString());
@@ -152,6 +162,28 @@ CUrlOptions CPlexTimeline::getTimeline(bool forServer)
         location = "fullScreenMusic";
 
       options.AddOption("location", location);
+
+      // PlayQueue Information
+      if (PlexUtils::IsPlayingPlaylist())
+      {
+        if (m_item->HasProperty("playQueueID"))
+          options.AddOption("playQueueID", m_item->GetProperty("playQueueID").asString());
+
+        if (m_item && m_item->HasMusicInfoTag())
+        {
+          try
+          {
+            std::string pqid = boost::lexical_cast<std::string>(m_item->GetMusicInfoTag()->GetDatabaseId());
+            options.AddOption("playQueueItemID", pqid);
+          }
+          catch (...)
+          {
+          }
+        }
+
+        if (m_item->HasProperty("playQueueVersion"))
+          options.AddOption("playQueueVersion", m_item->GetProperty("playQueueVersion").asString());
+      }
     }
     else if (m_continuing)
       options.AddOption("continuing", "1");
@@ -163,13 +195,10 @@ CUrlOptions CPlexTimeline::getTimeline(bool forServer)
       else
         options.AddOption("seekRange", "0-0");
     }
-
   }
 
   return options;
 }
-
-#define ADD_TIMELINE(tl) if (m_timelines.find(tl) != m_timelines.end && m_timelines[tl]) { tlines.push_back(m_timelines[tl]->getTimeline(false)); }
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 CXBMCTinyXML CPlexTimelineCollection::getTimelinesXML(int commandID)

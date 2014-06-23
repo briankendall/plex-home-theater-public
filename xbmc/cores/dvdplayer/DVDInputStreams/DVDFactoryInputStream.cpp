@@ -43,7 +43,12 @@
 #include "filesystem/File.h"
 #include "utils/URIUtils.h"
 
+/* PLEX */
+#include "GUISettings.h"
+#include "plex/FileSystem/PlexFile.h"
+/* END PLEX */
 
+#ifndef __PLEX__
 CDVDInputStream* CDVDFactoryInputStream::CreateInputStream(IDVDPlayer* pPlayer, const std::string& file, const std::string& content)
 {
   CFileItem item(file.c_str(), false);
@@ -117,3 +122,53 @@ CDVDInputStream* CDVDFactoryInputStream::CreateInputStream(IDVDPlayer* pPlayer, 
   // our file interface handles all these types of streams
   return (new CDVDInputStreamFile());
 }
+#else
+
+
+CDVDInputStream* CDVDFactoryInputStream::CreateInputStream(IDVDPlayer *pPlayer, const std::string &file, const std::string &content)
+{
+  CFileItem item(file.c_str(), false);
+
+  if(file.substr(0, 6) == "rtp://"
+     || file.substr(0, 7) == "rtsp://"
+     || file.substr(0, 6) == "sdp://"
+     || file.substr(0, 6) == "udp://"
+     || file.substr(0, 6) == "tcp://"
+     || file.substr(0, 6) == "mms://"
+     || file.substr(0, 7) == "mmst://"
+     || file.substr(0, 7) == "mmsh://"
+     || (item.IsInternetStream() && item.IsType(".m3u8")))
+    return new CDVDInputStreamFFmpeg();
+#ifdef ENABLE_DVDINPUTSTREAM_STACK
+  else if(file.substr(0, 8) == "stack://")
+    return new CDVDInputStreamStack();
+#endif
+#ifdef HAS_LIBRTMP
+  else if(file.substr(0, 7) == "rtmp://"
+       || file.substr(0, 8) == "rtmpt://"
+       || file.substr(0, 8) == "rtmpe://"
+       || file.substr(0, 9) == "rtmpte://"
+       || file.substr(0, 8) == "rtmps://")
+    return new CDVDInputStreamRTMP();
+#endif
+
+  // our file interface handles all these types of streams
+  /* PLEX */
+  if ((file.substr(0, 13) == "plexserver://") && (g_guiSettings.GetBool("videoplayer.useffmpegavio")))
+  {
+    // translte the url
+    CURL finalURL(file);
+    XFILE::CPlexFile::BuildHTTPURL(finalURL);
+
+    if (finalURL.GetProtocol() != "https")
+      return new CDVDInputStreamFFmpeg();
+    else
+      return new CDVDInputStreamFile();
+  }
+  else
+  /* END PLEX */
+    return (new CDVDInputStreamFile());
+
+}
+
+#endif

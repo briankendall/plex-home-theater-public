@@ -42,6 +42,7 @@ namespace PlexUtils
   std::string GetPlexCrashPath();
   CStdString GetPrettyStreamNameFromStreamItem(CFileItemPtr stream);
   CStdString GetPrettyStreamName(const CFileItem& fileItem, bool audio);
+  CStdString GetPrettyMediaItemName(const CFileItemPtr& mediaItem);
 
   CStdString GetSHA1SumFromURL(const CURL &url);
 
@@ -52,14 +53,25 @@ namespace PlexUtils
   void LogStackTrace(char *FuncName);
 
   ePlexMediaType GetMediaTypeFromItem(CFileItemPtr item);
+  ePlexMediaType GetMediaTypeFromItem(const CFileItem& item);
   std::string GetMediaTypeString(ePlexMediaType type);
   ePlexMediaType GetMediaTypeFromString(const std::string &typeString);
   ePlexMediaState GetMediaStateFromString(const std::string &statestring);
   std::string GetMediaStateString(ePlexMediaState state);
+
+  unsigned long GetFastHash(std::string Data);
+  bool IsPlayingPlaylist();
+  std::string GetCompositeImageUrl(const CFileItem& item, const CStdString& args);
+  std::string GetPlexContent(const CFileItem& item);
+  ePlexMediaFilterTypes GetFilterType(const CFileItem& item);
+  void SetItemResumeOffset(const CFileItemPtr& item, int64_t offint);
+  CFileItemPtr GetItemWithKey(const CFileItemList& list, const std::string& key);
 }
 
 #if defined(HAVE_EXECINFO_H)
 #define LOG_STACKTRACE  PlexUtils::LogStackTrace((char*)__PRETTY_FUNCTION__);
+#else
+#define LOG_STACKTRACE { }
 #endif
 
 #ifdef _WIN32

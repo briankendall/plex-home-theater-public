@@ -28,6 +28,10 @@
 #include "pvr/PVRManager.h"
 #include "pvr/channels/PVRChannelGroupsContainer.h"
 
+/* PLEX */
+#include "PlexUtils.h"
+/* END PLEX */
+
 using namespace PVR;
 
 CGUIDialogVideoOSD::CGUIDialogVideoOSD(void)
@@ -64,6 +68,11 @@ void CGUIDialogVideoOSD::FrameMove()
 
 bool CGUIDialogVideoOSD::OnAction(const CAction &action)
 {
+  /* PLEX */
+  if (action.GetID() == ACTION_NEXT_ITEM || action.GetID() == ACTION_PREV_ITEM)
+    return false;
+  /* END PLEX */
+
   if (action.GetID() == ACTION_NEXT_ITEM || action.GetID() == ACTION_PREV_ITEM || action.GetID() == ACTION_CHANNEL_UP || action.GetID() == ACTION_CHANNEL_DOWN)
   {
     // these could indicate next chapter if video supports it
@@ -79,6 +88,10 @@ bool CGUIDialogVideoOSD::OnAction(const CAction &action)
   }
   if (action.GetID() == ACTION_SHOW_CODEC || action.GetID() == ACTION_SHOW_INFO)
     return true;
+  if (action.GetID() == ACTION_SHOW_GUI)
+  {
+    g_windowManager.PreviousWindow();
+  }
   /* END PLEX */
 
   if (action.GetID() == ACTION_SHOW_OSD)
@@ -115,6 +128,7 @@ bool CGUIDialogVideoOSD::OnMessage(CGUIMessage& message)
   /* PLEX */
   case GUI_MSG_WINDOW_INIT:
     {
+      LOG_STACKTRACE
       if (message.GetStringParam(0) == "pauseOpen")
         m_openedFromPause = true;
       else

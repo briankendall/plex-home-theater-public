@@ -428,6 +428,17 @@ bool CGUIListItem::HasProperty(const CStdString &strKey) const
 
 void CGUIListItem::ClearProperty(const CStdString &strKey)
 {
+  /* PLEX */
+  CStdString _key(strKey);
+  _key.ToLower();
+
+  PropertyMap::iterator _iter = m_mapProperties.find(_key);
+  if (_iter != m_mapProperties.end())
+    m_mapProperties.erase(_iter);
+
+  return;
+  /* END PLEX */
+
   PropertyMap::iterator iter = m_mapProperties.find(strKey);
   if (iter != m_mapProperties.end())
     m_mapProperties.erase(iter);
@@ -457,37 +468,3 @@ void CGUIListItem::AppendProperties(const CGUIListItem &item)
   for (PropertyMap::const_iterator i = item.m_mapProperties.begin(); i != item.m_mapProperties.end(); ++i)
     SetProperty(i->first, i->second);
 }
-
-/* PLEX */
-bool CGUIListItem::HasArt(const string &type, int index) const
-{
-  return !GetArt(type, index).empty();
-}
-
-std::string CGUIListItem::GetArt(const string &type, int index) const
-{
-  if (index == 0)
-    return GetArt(type);
-
-  std::string typeNum = (boost::format("%s____%d") % type % index).str();
-  return GetArt(typeNum);
-}
-
-void CGUIListItem::SetArt(const string &type, int index, const string &url)
-{
-  if (index == 0)
-    SetArt(type, url);
-  else
-  {
-    std::string typeNum = (boost::format("%s____%d") % type % index).str();
-    SetArt(typeNum, url);
-  }
-}
-
-void CGUIListItem::RemoveArt(const string &type)
-{
-  if (HasArt(type))
-    m_art.erase(type);
-}
-
-/* END PLEX */
