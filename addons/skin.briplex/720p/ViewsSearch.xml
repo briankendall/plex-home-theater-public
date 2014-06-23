@@ -262,7 +262,7 @@
 		<control type="label">
 			<posy>209</posy>
 			<include>SearchScreenListItemTitle1</include>
-			<label>$INFO[ListItem.Title]_blah_blah</label>
+			<label>$INFO[ListItem.Title]</label>
 		</control>
 	</include>
 	<include name="SearchScreenSquareTitleAlbum">
@@ -314,7 +314,7 @@
 		<control type="label">
 			<posy>212</posy>
 			<include>SearchScreenListItemTitle1</include>
-			<label>$INFO[ListItem.Title]_blah_blah</label>
+			<label>$INFO[ListItem.Title]</label>
 			<textcolor>white</textcolor>
 		</control>
 	</include>
@@ -322,7 +322,7 @@
 		<control type="label">
 			<posy>209</posy>
 			<include>SearchScreenListItemTitle1</include>
-			<label>$INFO[ListItem.Title]_blah_blah</label>
+			<label>$INFO[ListItem.Title]</label>
 			<textcolor>orangeLight</textcolor>
 		</control>
 	</include>
@@ -395,7 +395,7 @@
 		<control type="label">
 			<posy>199</posy>
 			<include>SearchScreenListItemTitleWide</include>
-			<label>$INFO[ListItem.Title]_blah_blah</label>
+			<label>$INFO[ListItem.Title]</label>
 			<textcolor>white</textcolor>
 		</control>
 	</include>
@@ -403,7 +403,7 @@
 		<control type="label">
 			<posy>171</posy>
 			<include>SearchScreenListItemTitleWide</include>
-			<label>$INFO[ListItem.TVShowTitle]_ccc</label>
+			<label>$INFO[ListItem.TVShowTitle]</label>
 			<textcolor>FF888888</textcolor>
 		</control>
 	</include>
@@ -571,7 +571,7 @@
 				<align>center</align>
 				<aligny>center</aligny>
 				<scroll>false</scroll>
-				<label>$INFO[ListItem.Title]_blah_blah</label>
+				<label>$INFO[ListItem.Title]</label>
 				<font>Regular-16</font>
 				<textcolor>FF999999</textcolor>
 				<wrapmultiline>false</wrapmultiline>
@@ -619,7 +619,7 @@
 				<align>center</align>
 				<aligny>center</aligny>
 				<scroll>false</scroll>
-				<label>$INFO[ListItem.Title]_blah_blah</label>
+				<label>$INFO[ListItem.Title]</label>
 				<font>Regular-16</font>
 				<textcolor>FFFFFFFF</textcolor>
 				<wrapmultiline>false</wrapmultiline>
@@ -1210,7 +1210,7 @@
 							<visible>Control.HasFocus(9001)</visible>
 							<control type="label">
 								<align>left</align>
-								<label>$INFO[Container(9001).ListItem(0).Title]_blah</label>
+								<label>$INFO[Container(9001).ListItem(0).Title]</label>
 								<font>SearchResult</font>
 								<scroll>false</scroll>
 								<textcolor>orange</textcolor>
@@ -1326,7 +1326,7 @@
 							<visible>Control.HasFocus(9002)</visible>
 							<control type="label">
 								<align>left</align>
-								<label>$INFO[Container(9002).ListItem(0).Title]_blah</label>
+								<label>$INFO[Container(9002).ListItem(0).Title]</label>
 								<font>SearchResult</font>
 								<scroll>false</scroll>
 								<textcolor>orange</textcolor>
@@ -1440,7 +1440,7 @@
 							<visible>Control.HasFocus(9004)</visible>
 							<control type="label">
 								<align>left</align>
-								<label>$INFO[Container(9004).ListItem(0).TVShowTitle]_eee</label>
+								<label>$INFO[Container(9004).ListItem(0).TVShowTitle]</label>
 								<font>SearchResult</font>
 								<scroll>false</scroll>
 								<textcolor>orange</textcolor>
@@ -1577,7 +1577,7 @@
 							<visible>Control.HasFocus(9008)</visible>
 							<control type="label">
 								<align>left</align>
-								<label>$INFO[Container(9008).ListItem(0).Title]_blah</label>
+								<label>$INFO[Container(9008).ListItem(0).Title]</label>
 								<font>SearchResult</font>
 								<scroll>false</scroll>
 								<textcolor>orange</textcolor>
@@ -1791,7 +1791,7 @@
 							</control>
 							<control type="label">
 								<align>left</align>
-								<label> &#xB7; $INFO[Container(9010).ListItem(0).Title]_blah</label>
+								<label> &#xB7; $INFO[Container(9010).ListItem(0).Title]</label>
 								<font>SearchResult</font>
 								<scroll>false</scroll>
 								<textcolor>FFFFFFFF</textcolor>
@@ -1891,7 +1891,7 @@
 							<visible>Control.HasFocus(9013)</visible>
 							<control type="label">
 								<align>left</align>
-								<label>$INFO[Container(9013).ListItem(0).Title]_blah</label>
+								<label>$INFO[Container(9013).ListItem(0).Title]</label>
 								<font>SearchResult</font>
 								<scroll>false</scroll>
 								<textcolor>orange</textcolor>
@@ -1964,7 +1964,7 @@
 							<visible>Control.HasFocus(9012)</visible>
 							<control type="label">
 								<align>left</align>
-								<label>$INFO[Container(9012).ListItem(0).Title]_blah</label>
+								<label>$INFO[Container(9012).ListItem(0).Title]</label>
 								<font>SearchResult</font>
 								<scroll>false</scroll>
 								<textcolor>orange</textcolor>
@@ -2048,7 +2048,7 @@
 									<align>left</align>
 									<aligny>center</aligny>
 									<scroll>false</scroll>
-									<label>$INFO[ListItem.Title]_blah</label>
+									<label>$INFO[ListItem.title]</label>
 									<font>SearchResult</font>
 									<textcolor>FFdddddd</textcolor>
 									<wrapmultiline>false</wrapmultiline>
@@ -2130,7 +2130,7 @@
 									<align>left</align>
 									<aligny>center</aligny>
 									<scroll>false</scroll>
-									<label>$INFO[ListItem.Title]_blah</label>
+									<label>$INFO[ListItem.title]</label>
 									<font>SearchResult</font>
 									<textcolor>orange</textcolor>
 									<wrapmultiline>false</wrapmultiline>
