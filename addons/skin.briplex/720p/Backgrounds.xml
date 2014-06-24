@@ -24,6 +24,7 @@
 			</animation>
 			<visible>Container.Content(empty)</visible>
 		</control>
+		<!-- Bri Bri note: this is the background poster image -->
 		<control type="largeimage">
 			<include>FullScreenScaled</include>
 			<fadetime>400</fadetime>
