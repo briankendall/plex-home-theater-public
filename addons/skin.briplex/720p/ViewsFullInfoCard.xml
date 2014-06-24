@@ -245,6 +245,7 @@
 								<animation effect="fade" end="20" time="300" delay="0" condition="true">Conditional</animation>
 								<visible>Window.IsActive(mysharedcontent)</visible>
 							</control>
+							<!-- Bri Bri note: this is the upper left poster -->
 							<control type="image">
 								<include>ListItemFullInfoThumbSize</include>
 								<texture background="true">$INFO[ListItem.Property(Fanart_Image)]</texture>
