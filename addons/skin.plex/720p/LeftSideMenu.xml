@@ -3,6 +3,7 @@
 	<include name="leftMenuInitSlide">
 		<animation effect="slide" start="-74" end="0" time="400">Visible</animation>
 		<animation effect="slide" start="0" end="-74" time="400">Hidden</animation>
+		<animation effect="slide" start="0" end="-74" time="0" condition="Skin.String(SectionType,playqueue) + [Player.HasAudio | Player.HasVideo]">Conditional</animation>
 	</include>
 	<include name="leftMenuSlide">
 		<animation effect="slide" start="0" end="246" time="500" condition="ControlGroup(1300).HasFocus()">Conditional</animation>
@@ -282,6 +283,12 @@
 		<height>30</height>
 		<colordiffuse>FF999999</colordiffuse>
 	</include>
+	<include name="leftMenuPreplayButton">
+		<width>74</width>
+		<height>30</height>
+		<onleft>1300</onleft>
+		<onright>-</onright>
+	</include>
 	<include name="leftMenuBarButton">
 		<width>74</width>
 		<height>30</height>
@@ -344,32 +351,48 @@
 				</focusedlayout>
 				<!-- additional menu items -->
 				<content>
+					<item id="8">
+						<description>Switch User</description>
+						<label>Switch User</label>
+						<onclick>Dialog.Close(4998)</onclick>
+						<onclick>XBMC.ActivateWindow(selectuser)</onclick>
+						<visible>System.IsSignedIn + System.UserIsInHome</visible>
+					</item>
+					<item id="9">
+						<description>Sign In</description>
+						<label>Sign in</label>
+						<onclick>Dialog.Close(4998)</onclick>
+						<onclick>Plex.ActivateWindow(plexlogin)</onclick>
+						<visible>!System.IsSignedIn</visible>
+					</item>
 					<item id="12">
 						<description>Channel Directory</description>
 						<label> $LOCALIZE[31952]</label>
 						<onclick>Dialog.Close(4998)</onclick>
 						<onclick>Plex.ActivateWindow(1,plexserver://channeldirectory,return)</onclick>
 						<textcolor>50FFFFFF</textcolor>
+						<visible>!System.UserIsRestricted</visible>
 					</item>
 					<item id="6">
 						<description>Preferences</description>
 						<label>$LOCALIZE[31955]</label>
 						<onclick>Dialog.Close(4998)</onclick>
 						<onclick>XBMC.ActivateWindow(appearancesettings)</onclick>
+						<visible>!System.UserIsRestricted</visible>
 					</item>
 					<item id="101">
 						<description>OE Settings Button</description>
 						<label> $LOCALIZE[41000] </label>
 						<onclick>Dialog.Close(4998)</onclick>
 						<onclick>RunAddon(service.openelec.settings)</onclick>
-						<visible>System.isSystem(openelec)</visible>
+						<visible>System.isSystem(openelec) + !System.UserIsRestricted</visible>
 					</item>
 					<item id="102">
 						<description>Control Global Caching</description>
 						<label> $LOCALIZE[41001] </label>
 						<onclick>Dialog.Close(4998)</onclick>
-            <onclick>XBMC.ActivateWindow(10208)</onclick>
-						<visible>System.isSystem(rasplex)</visible>
+						<onclick>XBMC.ActivateWindow(10208)</onclick>
+						<visible>System.isSystem(rasplex) + !System.UserIsRestricted</visible>
 					</item>
 					<item id="111">
 						<description>Quit</description>
@@ -390,13 +413,14 @@
 						<label>$LOCALIZE[31961]</label>
 						<onclick>Dialog.Close(4998)</onclick>
 						<onclick>Plex.Powerdown</onclick>
+						<visible>!System.UserIsRestricted</visible>
 					</item>
 					<item id="114">
 						<description>Restart</description>
 						<label>$LOCALIZE[31072]</label>
 						<onclick>Dialog.Close(4998)</onclick>
 						<onclick>System.Exec(reboot)</onclick>
-						<visible>System.isSystem(openelec)</visible>
+						<visible>System.isSystem(openelec) + !System.UserIsRestricted</visible>
 					</item>
 					<item id="115">
 						<description>Sleep</description>
@@ -477,6 +501,12 @@
 						<onclick>Dialog.Close(4998)</onclick>
 						<onclick>XBMC.ActivateWindow(appearancesettings)</onclick>
 					</item>
+					<item id="7">
+						<description>Switch User</description>
+						<label>Switch User</label>
+						<onclick>Dialog.Close(4998)</onclick>
+						<onclick>XBMC.ActivateWindow(selectuser)</onclick>
+					</item>
 					<item id="112">
 						<description>Sleep</description>
 						<label>$LOCALIZE[31960]</label>
@@ -490,7 +520,7 @@
 	<!-- Library menu -->
 	<include name="LeftSideMenu">
 		<control type="group" id="995">
-			<visible allowhiddenfocus="false">[!Container.PlexContent(Channel) | [Container.PlexContent(Channel) + [ListItem.Type(clip) | ListItem.Type(episode) | ListItem.Type(song)]]]</visible>
+			<visible allowhiddenfocus="false">[!Container.PlexContent(Channel) | [Container.PlexContent(Channel) + [ListItem.Type(clip) | ListItem.Type(episode) | ListItem.Type(song)]]] | [Skin.String(SectionType,playqueue) + !Player.HasAudio + Container.PlexContent(Songs)]</visible>
 			<include>leftMenuInitSlide</include>
 			<include>leftMenuSlide</include>
 			<include>leftMenuBg</include>
@@ -530,7 +560,7 @@
 					<onclick>Plex.ShuffleAll()</onclick>
 					<include>leftMenuBarButton</include>
 					<visible>![Window.IsActive(501) + Container.PlexFilter(recentlyAdded)] + !Container.PlexFilter(recentlyViewedShows)</visible>
-				</control>				
+				</control>
 				<!-- Now Playing -->
 				<control type="button" id="106">
 					<texturefocus>-</texturefocus>
@@ -581,6 +611,16 @@
 					<include>leftMenuBarButton</include>
 					<onfocus>Skin.SetString(DialogPos,subtitlestreampicker)</onfocus>
 					<onunfocus>Skin.Reset(DialogPos)</onunfocus>
+				</control>
+				<!-- Extras -->
+				<control type="button" id="110">
+					<texturefocus>b-pp-extras-s.png</texturefocus>
+					<texturenofocus>b-pp-extras.png</texturenofocus>
+					<onright>XBMC.NextItem</onright>
+					<onleft>XBMC.PrevItem</onleft>
+					<onclick>SetFocus(3)</onclick>
+					<include>leftMenuBarButton</include>
+					<visible>!IsEmpty(ListItem.Property(PlexExtras))</visible>
 				</control>
 				<!-- Rate -->
 				<control type="button" id="105">
@@ -756,7 +796,7 @@
 					<include>leftMenuFormat</include>
 					<include>leftMenuSortingButton</include>
 				</control>
-			</control>			
+			</control>
 			<include>NowPlayingSideBar</include>
 		</control>
 	</include>
@@ -776,14 +816,14 @@
 					<control type="label">
 						<width>1400</width>
 						<height>0</height>
-						<label>$LOCALIZE[31606] $INFO[Container(997).ListItem(0).Label]</label>
+						<label>$VAR[TopBarSelectedItemStrings]</label>
 						<align>left</align>
 						<aligny>center</aligny>
 						<font>Bold-36</font>
 						<textcolor>orange</textcolor>
 						<shadowcolor>ff111111</shadowcolor>
-						<animation effect="fade" time="300" start="0" end="100">Focus</animation>
-						<visible>Control.HasFocus(997)</visible>
+						<animation effect="fade" start="80" end="80" condition="true">Conditional</animation>
+						<visible>Window.IsActive(4997)</visible>
 					</control>
 					<control type="label">
 						<width>1400</width>
@@ -795,66 +835,115 @@
 						<textcolor>white</textcolor>
 						<shadowcolor>ff111111</shadowcolor>
 						<animation effect="fade" time="300" start="0" end="30" condition="true">Conditional</animation>
-						<visible>!Control.HasFocus(997)</visible>
+						<visible>!Window.IsActive(4997)</visible>
 					</control>
 				</control>
 			</control>
-			<control type="list" id="997">
+			<control type="group">
+				<animation effect="fade" start="0" end="50" time="0" condition="true">Conditional</animation>
+				<control type="image">
+					<posx>0</posx>
+					<posy>108</posy>
+					<texture>b-s-photos.png</texture>
+					<visible>!Skin.String(SettingsCategory,appearance)</visible>
+				</control>
+				<control type="image">
+					<posx>0</posx>
+					<posy>108</posy>
+					<texture>b-s-photos-s.png</texture>
+					<visible>Skin.String(SettingsCategory,appearance)</visible>
+				</control>
+				<control type="image">
+					<posx>0</posx>
+					<posy>158</posy>
+					<texture>b-s-video.png</texture>
+					<visible>!Skin.String(SettingsCategory,playback)</visible>
+				</control>
+				<control type="image">
+					<posx>0</posx>
+					<posy>158</posy>
+					<texture>b-s-video-s.png</texture>
+					<visible>Skin.String(SettingsCategory,playback)</visible>
+				</control>
+				<control type="image">
+					<posx>0</posx>
+					<posy>208</posy>
+					<texture>b-s-system.png</texture>
+					<visible>!Skin.String(SettingsCategory,system)</visible>
+				</control>
+				<control type="image">
+					<posx>0</posx>
+					<posy>208</posy>
+					<texture>b-s-system-s.png</texture>
+					<visible>Skin.String(SettingsCategory,system)</visible>
+				</control>
+				<control type="image">
+					<posx>0</posx>
+					<posy>258</posy>
+					<texture>b-s-network.png</texture>
+					<visible>!Skin.String(SettingsCategory,network)</visible>
+				</control>
+				<control type="image">
+					<posx>0</posx>
+					<posy>258</posy>
+					<texture>b-s-network-s.png</texture>
+					<visible>Skin.String(SettingsCategory,network)</visible>
+				</control>
+			</control>
+		</control>
+	</include>
+	<include name="LeftSideMenuSettings2">
+		<control type="group">
+			<include>leftMenuInitSlide</include>
+			<include>leftMenuBgSettings</include>
+			<control type="grouplist" id="997">
 				<posx>0</posx>
-				<posy>90</posy>
+				<posy>108</posy>
 				<width>1000</width>
 				<height>700</height>
 				<onup>997</onup>
 				<ondown>997</ondown>
 				<onleft>-</onleft>
-				<onright>302</onright>
-				<focusposition>1</focusposition>
+				<onright>-</onright>
+				<itemgap>20</itemgap>
 				<scrolltime>0</scrolltime>
 				<orientation>vertical</orientation>
-				<itemlayout width="1400" height="50">
-					<control type="image">
-						<posx>0</posx>
-						<posy>18</posy>
-						<aspectratio>keep</aspectratio>
-						<info>ListItem.Art(thumb)</info>
-						<include>leftMenuBarIcon</include>
-					</control>
-				</itemlayout>
-				<focusedlayout width="1400" height="50">
-					<control type="image">
-						<posx>0</posx>
-						<posy>18</posy>
-						<info>ListItem.Art(thumb)</info>
-						<include>leftMenuBarButton</include>
-						<colordiffuse>orange</colordiffuse>
-					</control>
-				</focusedlayout>
-				<content>
-					<item id="1">
-						<description>Playback Settings Button</description>
-						<label>$LOCALIZE[31610]</label>
-						<thumb>b-s-video.png</thumb>
-						<onclick>XBMC.ReplaceWindow(17)</onclick>
-					</item>
-					<item id="2">
-						<description>Appearance Settings Button</description>
-						<label>$LOCALIZE[31601]</label>
-						<thumb>b-s-photos.png</thumb>
-						<onclick>XBMC.ReplaceWindow(19)</onclick>
-					</item>
-					<item id="5">
-						<description>System Settings Button</description>
-						<label>$LOCALIZE[31006]</label>
-						<thumb>b-s-system.png</thumb>
-						<onclick>XBMC.ReplaceWindow(16)</onclick>
-					</item>
-					<item id="5">
-						<description>Network Button</description>
-						<label>$LOCALIZE[31602]</label>
-						<thumb>b-s-network.png</thumb>
-						<onclick>XBMC.ReplaceWindow(18)</onclick>
-					</item>
-				</content>
+				<control type="button" id="902">
+					<description>Appearance Settings Button</description>
+					<texturefocus>b-s-photos-s.png</texturefocus>
+					<texturenofocus>b-s-photos.png</texturenofocus>
+					<include>leftMenuPreplayButton</include>
+					<onfocus condition="!Window.IsActive(19)">XBMC.ReplaceWindow(19)</onfocus>
+					<onright>Dialog.Close(4997)</onright>
+					<onfocus>Skin.SetString(SettingsCategory,appearance)</onfocus>
+				</control>
+				<control type="button" id="901">
+					<description>Playback Settings Button</description>
+					<texturefocus>b-s-video-s.png</texturefocus>
+					<texturenofocus>b-s-video.png</texturenofocus>
+					<include>leftMenuPreplayButton</include>
+					<onfocus condition="!Window.IsActive(17)">XBMC.ReplaceWindow(17)</onfocus>
+					<onright>Dialog.Close(4997)</onright>
+					<onfocus>Skin.SetString(SettingsCategory,playback)</onfocus>
+				</control>
+				<control type="button" id="903">
+					<description>System Settings Button</description>
+					<texturefocus>b-s-system-s.png</texturefocus>
+					<texturenofocus>b-s-system.png</texturenofocus>
+					<include>leftMenuPreplayButton</include>
+					<onfocus condition="!Window.IsActive(16)">XBMC.ReplaceWindow(16)</onfocus>
+					<onright>Dialog.Close(4997)</onright>
+					<onfocus>Skin.SetString(SettingsCategory,system)</onfocus>
+				</control>
+				<control type="button" id="904">
+					<description>Network Button</description>
+					<texturefocus>b-s-network-s.png</texturefocus>
+					<texturenofocus>b-s-network.png</texturenofocus>
+					<include>leftMenuPreplayButton</include>
+					<onfocus condition="!Window.IsActive(18)">XBMC.ReplaceWindow(18)</onfocus>
+					<onright>Dialog.Close(4997)</onright>
+					<onfocus>Skin.SetString(SettingsCategory,network)</onfocus>
+				</control>
 			</control>
 		</control>
 	</include>

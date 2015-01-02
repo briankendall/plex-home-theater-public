@@ -15,7 +15,9 @@
 CPlexRemoteResponse CPlexRemotePlaybackHandler::handle(const CStdString &url, const ArgMap &arguments)
 {
   if (url.Equals("/player/playback/stepForward") ||
-           url.Equals("/player/playback/stepBack"))
+           url.Equals("/player/playback/stepBack") ||
+           url.Equals("/player/playback/bigStepForward") ||
+           url.Equals("/player/playback/bigStepBack"))
     return stepFunction(url, arguments);
   else if (url.Equals("/player/playback/skipNext"))
     return skipNext(arguments);
@@ -360,7 +362,8 @@ CPlexRemoteResponse CPlexRemotePlaybackHandler::refreshPlayQueue(const ArgMap &a
 
   playQueueId = boost::lexical_cast<int>(arguments.find("playQueueID")->second);
 
-  if (g_plexApplication.playQueueManager->getCurrentID() == playQueueId)
-    g_plexApplication.playQueueManager->refreshCurrent();
+  CPlexPlayQueuePtr pq = g_plexApplication.playQueueManager->getPlayQueueFromID(playQueueId);
+    pq->refresh();
+  
   return CPlexRemoteResponse();
 }

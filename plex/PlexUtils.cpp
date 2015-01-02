@@ -7,7 +7,7 @@
 #include <boost/lexical_cast.hpp>
 #include <boost/random.hpp>
 
-#include "Utility/sha1.hpp"
+#include "Third-Party/hash-library/sha1.h"
 
 #include "PlexUtils.h"
 #include "File.h"
@@ -26,6 +26,9 @@
 #include "Key.h"
 #include "GUI/GUIPlexMediaWindow.h"
 #include "Application.h"
+#include "threads/Atomics.h"
+#include "music/tags/MusicInfoTag.h"
+#include "video/VideoInfoTag.h"
 
 #include "File.h"
 
@@ -576,11 +579,11 @@ CStdString PlexUtils::GetSHA1SumFromURL(const CURL &url)
 
     while (read != 0)
     {
-      sha.update(buffer, read);
+      sha.add(buffer, read);
       read = file.Read(buffer, 4096);
     }
 
-    return sha.end().hex();
+    return sha.getHash();
   }
 
   return "";
@@ -711,6 +714,13 @@ ePlexMediaType PlexUtils::GetMediaTypeFromItem(const CFileItem& item)
     case PLEX_DIR_TYPE_PHOTO:
     case PLEX_DIR_TYPE_PHOTOALBUM:
       return PLEX_MEDIA_TYPE_PHOTO;
+    case PLEX_DIR_TYPE_PLAYLIST:
+      if (item.GetProperty("playlisttype").asString() == "audio")
+        return PLEX_MEDIA_TYPE_MUSIC;
+      else if (item.GetProperty("playlisttype").asString() == "video")
+        return PLEX_MEDIA_TYPE_VIDEO;
+      else
+        return PLEX_MEDIA_TYPE_UNKNOWN;
     default:
       return PLEX_MEDIA_TYPE_UNKNOWN;
   }
@@ -907,6 +917,9 @@ string PlexUtils::GetPlexContent(const CFileItem &item)
     case PLEX_DIR_TYPE_PHOTOALBUM:
       content = "photoalbums";
       break;
+    case PLEX_DIR_TYPE_PLAYLIST:
+      content = "playlists";
+      break;
     default:
       break;
   }
@@ -916,7 +929,13 @@ string PlexUtils::GetPlexContent(const CFileItem &item)
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 ePlexMediaFilterTypes PlexUtils::GetFilterType(const CFileItem& item)
 {
-  switch (item.GetPlexDirectoryType())
+  return GetFilterType(item.GetPlexDirectoryType());
+}
+
+///////////////////////////////////////////////////////////////////////////////////////////////////
+ePlexMediaFilterTypes PlexUtils::GetFilterType(EPlexDirectoryType type)
+{
+  switch (type)
   {
     case PLEX_DIR_TYPE_MOVIE:
       return PLEX_MEDIA_FILTER_TYPE_MOVIE;
@@ -983,3 +1002,102 @@ CFileItemPtr PlexUtils::GetItemWithKey(const CFileItemList& list, const std::str
 
   return CFileItemPtr();
 }
+
+///////////////////////////////////////////////////////////////////////////////////////////////////
+void PlexUtils::PauseRendering(bool bPause, bool bUseWaitDialog)
+{
+  static long pauseRequestCount = 0;
+
+  // now handle the wait dialog stuff
+  if (bUseWaitDialog)
+  {
+    // we remove Wait Dialog animations as we want it to show immediately before rendering is paused
+    CGUIDialogBusy* busy = (CGUIDialogBusy*)g_windowManager.GetWindow(WINDOW_DIALOG_BUSY);
+    std::vector<CAnimation> emptyAnims;
+    busy->SetAnimations(emptyAnims);
+
+    if (bPause)
+    {
+      if (busy)
+        busy->Show();
+
+      // render one last time to show busy dialog
+      g_windowManager.ProcessRenderLoop();
+    }
+    else
+    {
+      if (busy && busy->IsActive())
+        busy->Close();
+    }
+  }
+
+  // we handle wether we should stop or resume depending on pause counts
+  // this allows several jobs to ask for pause and only resume when last
+  // job is finished
+  if (bPause)
+  {
+    AtomicIncrement(&pauseRequestCount);
+  }
+  else
+  {
+    if (pauseRequestCount > 0)
+      AtomicDecrement(&pauseRequestCount);
+  }
+
+  g_application.SetRenderGUI(pauseRequestCount == 0);
+}
+
+///////////////////////////////////////////////////////////////////////////////////////////////////
+int PlexUtils::GetItemListID(const CFileItem& item)
+{
+  if (item.HasMusicInfoTag())
+    return item.GetMusicInfoTag()->GetDatabaseId();
+  else if (item.HasVideoInfoTag())
+    return item.GetVideoInfoTag()->m_iDbId;
+  return -1;
+}
+
+///////////////////////////////////////////////////////////////////////////////////////////////////
+int PlexUtils::GetItemListID(const CFileItemPtr& item)
+{
+  return GetItemListID(*item);
+}
+
+///////////////////////////////////////////////////////////////////////////////////////////////////
+std::string PlexUtils::GetPlayListIDfromPath(CStdString plpath)
+{
+  int pos = plpath.Find("playlists/");
+  if (pos > 0)
+  {
+    pos += 10;
+    int endpos = plpath.Find("/", pos);
+    if (endpos)
+      return plpath.Mid(pos, endpos-pos);
+  }
+  
+  return "";
+}
+
+///////////////////////////////////////////////////////////////////////////////////////////////////
+void PlexUtils::PrintItemProperties(CGUIListItemPtr item)
+{
+  PropertyMap props = item->GetAllProperties();
+  printf("Item Properties :\n");
+  for (PropertyMap::iterator it = props.begin(); it != props.end(); ++it)
+  {
+    printf("%s : %s\n", it->first.c_str(), it->second.c_str());
+  }
+}
+
+///////////////////////////////////////////////////////////////////////////////////////////////////
+CURL PlexUtils::MakeUrlSecret(CURL url)
+{
+  CURL secretURL(url);
+  if (!secretURL.GetUserName().empty())
+    secretURL.SetUserName("SECRETUSER");
+  if (!secretURL.GetPassWord().empty())
+    secretURL.SetPassword("SECRETPASSWORD");
+
+  return secretURL;
+}
+

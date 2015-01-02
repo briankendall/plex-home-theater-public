@@ -325,6 +325,12 @@
 #define ACTION_PLEX_SHUFFLE_ALL       306
 #define ACTION_PLEX_MOVE_NEXT_ITEM    307
 #define ACTION_PLEX_MOVE_PREV_ITEM    308
+#define ACTION_PLEX_PLAY_TRAILER      309
+#define ACTION_PLEX_NOW_PLAYING       310
+#define ACTION_PLEX_PQ_CLEAR          311
+#define ACTION_PLEX_PQ_ADDUPTONEXT    312
+#define ACTION_PLEX_PL_ADDTO          313
+#define ACTION_PLEX_PL_CREATE         314
 /* END PLEX */
 
 // Window ID defines to make the code a bit more readable
@@ -410,6 +416,10 @@
 #define WINDOW_DIALOG_PERIPHERAL_SETTINGS 10150
 #define WINDOW_DIALOG_EXT_PROGRESS        10151
 #define WINDOW_DIALOG_MEDIA_FILTER        10152
+
+/* PLEX */
+#define WINDOW_DIALOG_SETTINGS_MENU       14997
+/* END PLEX */
 
 #define WINDOW_MUSIC_PLAYLIST             10500
 #define WINDOW_MUSIC_FILES                10501

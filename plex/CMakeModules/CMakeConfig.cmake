@@ -22,6 +22,11 @@ endif(ENABLE_TESTING)
 
 OPTION(ENABLE_AUTOUPDATE "Enable the cool autoupdate system" ON)
 
+OPTION(USE_PAGING "Enable media section paging" ON)
+if(USE_PAGING)
+  add_definitions(-DUSE_PAGING=1)
+endif(USE_PAGING)
+
 if(NOT TARGET_RPI)
   OPTION(COMPRESS_TEXTURES "If we should compress the textures or not" ON)
 endif()
@@ -85,8 +90,8 @@ elseif(TARGET_LINUX)
   endif()
 endif(TARGET_OSX)
 
+set_property(DIRECTORY APPEND PROPERTY COMPILE_DEFINITIONS $<$<CONFIG:Debug>:_DEBUG>)
 add_definitions(-D__PLEX__ -D__PLEX__XBMC__ -DPLEX_BUILD_TAG="${BUILD_TAG}" -DPLEX_TARGET_NAME="${EXECUTABLE_NAME}" -DENABLE_DVDINPUTSTREAM_STACK)
-set_directory_properties(PROPERTIES COMPILE_DEFINITIONS_DEBUG "_DEBUG")
 
 include(CheckFFmpegIncludes)
 if(NOT TARGET_RPI)
@@ -131,6 +136,9 @@ endif(HAVE_BREAKPAD)
 
 # check some compiler Intrinsics
 find_package(Intrinsics)
+
+# check for the python executable, which we need to create the AutoUpdate
+find_package(PythonInterp)
 
 # this file is not needed on windows
 if(NOT WIN32)
