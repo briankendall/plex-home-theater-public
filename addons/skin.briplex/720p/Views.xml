@@ -1,10 +1,5 @@
 <?xml version="1.0"?>
 <includes>
-    <!-- Bri Bri -->
-    <variable name="Padded_Episode">
-        <value condition="IntegerGreaterThan(ListItem.Episode,9)">$INFO[ListItem.Episode]</value>
-        <value condition="!IntegerGreaterThan(ListItem.Episode,9)">$INFO[ListItem.Episode,0]</value>
-    </variable>
 	<!-- Thumbs -->
 	<include name="ListSelectedArt">
 		<!-- TV Show Banner -->
@@ -35,7 +30,7 @@
 		</control>
 		<!-- Episode Thumb -->
 		<control type="group">
-			<visible>Container.PlexContent(Episodes) | [Container.PlexContent(Channel) + [ListItem.Type(clip) | ListItem.Type(episode)]]</visible>
+			<visible>Container.PlexContent(HomeMovies) | Container.PlexContent(Episodes) | [Container.PlexContent(Channel) + [ListItem.Type(clip) | ListItem.Type(episode)]]</visible>
 			<control type="image">
 				<posx>23</posx>
 				<posy>37</posy>
@@ -115,7 +110,6 @@
 			<height>30</height>
 			<texture background="true">default-square-small.png</texture>
 		</control>
-		<!-- Bri Bri note: these two are the selected item poster thumbnail -->
 		<control type="image">
 			<include>PosListItem</include>
 			<width>30</width>
@@ -333,8 +327,7 @@
 						<control type="label">
 							<width>840</width>
 							<height>50</height>
-							<!-- Bri Bri -->
-							<label>[COLOR=greyLighter]$INFO[ListItem.TVShowTitle][/COLOR][COLOR=greyLighter] $INFO[ListItem.Season, [COLOR=orange]&#xB7; [/COLOR]]x$VAR[Padded_Episode][/COLOR]$INFO[ListItem.Title, [COLOR=orange]&#xB7; [/COLOR]]</label>
+							<label>[COLOR=greyLighter]$INFO[ListItem.TVShowTitle][/COLOR]$INFO[ListItem.Label, [COLOR=orange]&#xB7; [/COLOR]]</label>
 							<font>Regular-20</font>
 							<include>White2</include>
 							<textoffsetx>80</textoffsetx>
@@ -369,8 +362,6 @@
 							<width>525</width>
 							<height>50</height>
 							<info>ListItem.TVShowTitle</info>
-							<!-- Bri Bri -->
-							<!-- <label>Season $INFO[ListItem.Season] Episode $INFO[ListItem.Episode]</label> -->
 							<aligny>center</aligny>
 							<font>Bold-32</font>
 							<textcolor>white</textcolor>
@@ -393,9 +384,7 @@
 							<posy>50</posy>
 							<width>525</width>
 							<height>50</height>
-							<!-- Bri Bri -->
-							<label>[COLOR=greyLighter]$INFO[ListItem.Season]x$VAR[Padded_Episode][/COLOR]$INFO[ListItem.Title, [COLOR=orange]&#xB7; [/COLOR]]</label>
-							<!-- <info>ListItem.Label</info> -->
+							<info>ListItem.Label</info>
 							<aligny>center</aligny>
 							<font>Bold-32</font>
 							<textcolor>orange</textcolor>
@@ -425,9 +414,7 @@
 						<control type="label">
 							<width>840</width>
 							<height>50</height>
-							<!-- <info>ListItem.Label</info> -->
-							<!-- Bri Bri -->
-							<label>$INFO[ListItem.Episode]. $INFO[ListItem.Label]</label>
+							<info>ListItem.Label</info>
 							<font>Regular-20</font>
 							<include>White2</include>
 							<textoffsetx>80</textoffsetx>
@@ -791,9 +778,7 @@
 							<posx>55</posx>
 							<width>900</width>
 							<height>100</height>
-							<!-- <info>ListItem.Label</info> -->
-							<!-- Bri Bri -->
-							<label>$INFO[ListItem.Episode]. $INFO[ListItem.Label]</label>
+							<info>ListItem.Label</info>
 							<aligny>center</aligny>
 							<font>Bold-32</font>
 							<textcolor>orange</textcolor>
