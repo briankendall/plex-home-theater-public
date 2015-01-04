@@ -235,7 +235,9 @@ bool CPlexServer::UpdateReachability()
   BOOST_FOREACH(CPlexConnectionPtr conn, sortedConnections)
   {
     CLog::Log(LOGDEBUG, "CPlexServer::UpdateReachability testing connection %s", conn->toString().c_str());
-    if (g_plexApplication.myPlexManager->GetCurrentUserInfo().restricted && conn->GetAccessToken().IsEmpty())
+    if (g_plexApplication.myPlexManager &&
+        g_plexApplication.myPlexManager->GetCurrentUserInfo().restricted &&
+        conn->GetAccessToken().IsEmpty())
     {
       CLog::Log(LOGINFO, "CPlexServer::UpdateReachability skipping connection %s since we are restricted", conn->toString().c_str());
       m_connectionsLeft --;
@@ -480,16 +482,15 @@ void CPlexServer::AddConnection(CPlexConnectionPtr connection)
   m_connections.push_back(connection);
 }
 
-CStdString
-CPlexServer::toString() const
+///////////////////////////////////////////////////////////////////////////////////////////////////
+CStdString CPlexServer::toString() const
 {
   CStdString ret;
-  ret.Format("%s version: %s owned: %s videoTranscode: %s audioTranscode: %s deletion: %s class: %s",
+  ret.Format("%s version: %s activeConnection: %s owner: %s deletion: %s class: %s",
              m_name,
              m_version,
-             m_owned ? "YES" : "NO",
-             m_supportsVideoTranscoding ? "YES" : "NO",
-             m_supportsAudioTranscoding ? "YES" : "NO",
+             m_activeConnection ? m_activeConnection->GetAddress().GetHostName() : "NO",
+             m_owner.empty() ? "you" : m_owner,
              m_supportsDeletion ? "YES" : "NO",
              m_serverClass);
 
