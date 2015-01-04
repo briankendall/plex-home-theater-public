@@ -38,6 +38,7 @@
 #include "PlexGlobalTimer.h"
 #include "PlexSectionFanout.h"
 #include "dialogs/GUIDialogContextMenu.h"
+#include "GUI/GUIPlexWindowFocusSaver.h"
 
 // List IDs.
 #define CONTEXT_BUTTON_SLEEP (CONTEXT_BUTTON_RATING + 1)
@@ -65,6 +66,7 @@ private:
   void RefreshSection(const CStdString& url, CPlexSectionFanout::SectionTypes type);
   void RefreshAllSections(bool force = true);
   void RefreshSectionsForServer(const CStdString &uuid);
+  void RemoveSectionsForServer(const CStdString &uuid);
   void AddSection(const CStdString& url, CPlexSectionFanout::SectionTypes sectionType, bool useGlobalSlideshow);
   void RemoveSection(const CStdString& url);
   bool ShowSection(const CStdString& url);
@@ -75,8 +77,10 @@ private:
   void OpenItem(CFileItemPtr item);
   bool OnClick(const CGUIMessage& message);
   void OnSectionLoaded(const CGUIMessage& message);
+  void OnWatchStateChanged(const CGUIMessage& message);
 
-  void AddPlayQueue(std::vector<CGUIListItemPtr>& list, bool& updated);
+  void AddPlaylists(std::vector<CGUIListItemPtr>& list, bool& updated);
+  void AddPlayQueues(std::vector<CGUIListItemPtr>& list,  bool& updated);
   int GetPlayQueueType();
 
   void OnJobComplete(unsigned int jobID, bool success, CJob *job);
@@ -116,5 +120,8 @@ private:
   CEvent                     m_loadNavigationEvent;
   bool                       m_cacheLoadFail;
   CPlexNavigationHelper      m_navHelper;
+
+  // focus saving members
+  CGUIPlexWindowFocusSaver  m_focusSaver;
 };
 

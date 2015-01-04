@@ -19,6 +19,10 @@
 #include "guilib/GUIButtonControl.h"
 #include "PlexNavigationHelper.h"
 #include "gtest/gtest_prod.h"
+#include <set>
+
+// for trunc.
+#include <boost/math/special_functions/trunc.hpp>
 
 #define FILTER_PRIMARY_CONTAINER     19000
 #define FILTER_SECONDARY_CONTAINER   19001
@@ -44,6 +48,10 @@
 class PlexMediaWindowTests;
 class PlexMediaWindowUniformPropertyTests;
 
+typedef std::set<int> FetchPages;
+typedef boost::unordered_map<int, int> FetchJobMap;
+typedef std::pair<int, int> FetchJobPair;
+
 class CGUIPlexMediaWindow : public CGUIMediaWindow, public IJobCallback
 {    
   friend class PlexMediaWindowTests;
@@ -54,7 +62,7 @@ class CGUIPlexMediaWindow : public CGUIMediaWindow, public IJobCallback
 
   public:
     CGUIPlexMediaWindow(int windowId = WINDOW_VIDEO_NAV, const CStdString &xml = "MyVideoNav.xml") :
-      CGUIMediaWindow(windowId, xml), m_returningFromSkinLoad(false), m_pagingOffset(0), m_currentJobId(-1), m_hasAdvancedFilters(false), m_clearFilterButton(NULL) { m_loadType = LOAD_ON_GUI_INIT; };
+      CGUIMediaWindow(windowId, xml), m_returningFromSkinLoad(false), m_hasAdvancedFilters(false), m_clearFilterButton(NULL) { m_loadType = LOAD_ON_GUI_INIT; };
     bool OnMessage(CGUIMessage &message);
     bool OnAction(const CAction& action);
     virtual bool GetDirectory(const CStdString &strDirectory, CFileItemList &items);
@@ -71,6 +79,9 @@ class CGUIPlexMediaWindow : public CGUIMediaWindow, public IJobCallback
     void OnFilterSelected(const std::string& filterKey, int filterButtonId);
     static CURL GetRealDirectoryUrl(const CStdString &strDirectory);
 
+    void SaveSelection();
+    bool RestoreSelection();
+  
     void CheckPlexFilters(CFileItemList &list);
     void UpdateButtons();
     void PlayAll(bool shuffle, const CFileItemPtr &fromHere = CFileItemPtr());
@@ -83,6 +94,8 @@ class CGUIPlexMediaWindow : public CGUIMediaWindow, public IJobCallback
     bool IsFiltered();
     bool CanFilterAdvanced();
 
+    void FetchItemPage(int itemIndex);
+    inline int GetPageFromItemIndex(int index)  { return boost::math::trunc(index / PLEX_DEFAULT_PAGE_SIZE); }
 private:
     void AddFilters();
 
@@ -99,20 +112,18 @@ private:
       return currentPlaylist;
     }
 
-    void LoadPage(int start, int numberOfItems);
-    void LoadNextPage();
+    void LoadPage(int iPage);
     virtual void OnJobComplete(unsigned int jobID, bool success, CJob *job);
     void updateFilterButtons(CPlexSectionFilterPtr filter, bool clear=false, bool disable=false);
     void ToggleClearFilterButton(bool onOff);
 
     bool m_returningFromSkinLoad;
-    int m_pagingOffset;
-    int m_currentJobId;
     CURL m_sectionRoot;
     void UpdateSectionTitle();
     bool UnwatchedEnabled() const;
     std::string GetFilteredURI(const CFileItem &item) const;
 
+    CStdString GetLevelURL();
 
     bool m_hasAdvancedFilters;
     CCriticalSection m_filterValuesSection;
@@ -124,12 +135,16 @@ private:
 
     CPlexNavigationHelper m_navHelper;
     CURL GetUrlWithParentArgument(const CURL &originalUrl);
-    void InsertPage(CFileItemList *items);
+    void InsertPage(CFileItemList *items, int Where);
 
     CPlexThumbCacher m_thumbCache;
     CPlexSectionFilterPtr m_sectionFilter;
-
     std::map<std::string, bool> m_contentMatch;
+    EPlexDirectoryType m_directoryType;
+
+    CCriticalSection m_fetchMapsSection;
+    FetchPages m_fetchedPages;
+    FetchJobMap m_fetchJobs;
 };
 
 class CGUIPlexMusicWindow : public CGUIPlexMediaWindow

@@ -114,9 +114,20 @@ CPlexDirectoryTypeParserVideo::Process(CFileItem &item, CFileItem &mediaContaine
   item.SetFromVideoInfoTag(videoTag);
   
   if (item.HasProperty("viewOffset") && item.GetProperty("viewOffset").asInteger() > 0)
+  {
     item.SetOverlayImage(CGUIListItem::ICON_OVERLAY_IN_PROGRESS);
+
+    int progress = 0;
+    if (item.GetProperty("duration").asInteger() != 0)
+      progress = (item.GetProperty("viewOffset").asInteger() * 100 / item.GetProperty("duration").asInteger());
+
+    item.SetProperty("progress",progress);
+  }
   else
+  {
     item.SetOverlayImage(CGUIListItem::ICON_OVERLAY_UNWATCHED, videoTag.m_playCount > 0);
+    item.SetProperty("progress",0);
+  }
   
   /* for directories with leafCount and viewLeafCount */
   if ((item.GetPlexDirectoryType() == PLEX_DIR_TYPE_SHOW ||
@@ -158,21 +169,20 @@ CPlexDirectoryTypeParserVideo::Process(CFileItem &item, CFileItem &mediaContaine
   item.SetProperty("selectedAudioStream", PlexUtils::GetPrettyStreamName(item, true));
   item.SetProperty("selectedSubtitleStream", PlexUtils::GetPrettyStreamName(item, false));
 
-  // We misuse the MusicInfoTag a bit here so we can call PlayListPlayer::PlaySongId()
   if (item.HasProperty("playQueueItemID"))
   {
-    item.GetMusicInfoTag()->SetDatabaseId(item.GetProperty("playQueueItemID").asInteger(), "video");
+    item.GetVideoInfoTag()->m_iDbId = item.GetProperty("playQueueItemID").asInteger();
   }
   else if (item.HasProperty("ratingKey"))
   {
-    item.GetMusicInfoTag()->SetDatabaseId(item.GetProperty("ratingKey").asInteger(), "video");
+    item.GetVideoInfoTag()->m_iDbId = item.GetProperty("ratingKey").asInteger();
   }
   else
   {
     int id = mediaContainer.GetProperty("__containerItemIndex").asInteger(0);
     // ok, this is probably a channel, we still need a pretty unique id, so let's
     // just try to get unique id for this certain container
-    item.GetMusicInfoTag()->SetDatabaseId(id, "video");
+    item.GetVideoInfoTag()->m_iDbId = id;
     mediaContainer.SetProperty("__containerItemIndex", ++ id);
   }
   
